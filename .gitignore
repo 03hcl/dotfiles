@@ -1,0 +1,11 @@
+/*
+
+!/.bash_aliases
+!/.bash_logout
+!/.bashrc
+!/.gitignore
+!/README.md
+
+!/.bin
+/.bin/*
+!/.bin/hadolint

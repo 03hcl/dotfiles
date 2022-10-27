@@ -1,0 +1,5 @@
+#!/bin/bash
+
+dockerfile="$1"
+shift
+docker run --rm -i docker.io/hadolint/hadolint "$@" < "$dockerfile"
