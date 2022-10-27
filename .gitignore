@@ -5,3 +5,7 @@
 !/.bashrc
 !/.gitignore
 !/README.md
+
+!/.bin
+/.bin/*
+!/.bin/hadolint

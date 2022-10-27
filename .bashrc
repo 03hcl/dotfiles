@@ -121,3 +121,4 @@ if ! shopt -oq posix; then
 fi
 
 export LANG='ja_JP.UTF-8'
+export PATH=$PATH':~/.bin'
