@@ -8,4 +8,9 @@
 
 !/.bin
 /.bin/*
-!/.bin/hadolint
+
+!/.local
+/.local/*
+!/.local/bin
+/.local/bin/*
+!/.local/bin/hadolint
