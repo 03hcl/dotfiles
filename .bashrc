@@ -120,5 +120,10 @@ if ! shopt -oq posix; then
   fi
 fi
 
+# User specific environment and startup programs
+
+export PATH=$PATH:$HOME/.local/bin:$HOME/bin
+
+########################################
+
 export LANG='ja_JP.UTF-8'
-export PATH=$PATH':~/.bin'
