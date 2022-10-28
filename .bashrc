@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+	. /etc/bashrc
+fi
+
+# Uncomment the following line if you don't like systemctl's auto-paging feature:
+# export SYSTEMD_PAGER=
+
+########################################
+
 # ~/.bashrc: executed by bash(1) for non-login shells.
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
@@ -120,10 +130,10 @@ if ! shopt -oq posix; then
   fi
 fi
 
+########################################
+
 # User specific environment and startup programs
 
 export PATH=$PATH:$HOME/.local/bin:$HOME/bin
-
-########################################
 
 export LANG='ja_JP.UTF-8'
