@@ -20,5 +20,6 @@ alias .....='cd ../../../..'
 alias ......='cd ../../../../..'
 
 if [ -f ~/.bash_aliases_local ]; then
+    # shellcheck disable=SC1090
     . ~/.bash_aliases_local
 fi
