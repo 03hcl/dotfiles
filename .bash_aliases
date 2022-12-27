@@ -13,8 +13,8 @@ alias df7="df-sort 7"
 alias nemui="echo 'ねむい'"
 alias rand0="rand 'a-z'"
 alias rand1="rand 'a-zA-Z0-9'"
-alias rand2="rand 'a-zA-Z0-9#%+,-./:=@_~'"                  # without bash meta characters
-alias rand3="rand 'a-zA-Z0-9!#$%&()*+,-./:;<=>?@[]^_{|}~'"  # without spaces and " ' ` \
+alias rand2="rand '#%+,./:=@_~a-zA-Z0-9-'"                  # without bash meta characters
+alias rand3="rand '!#$%&()*+,./:;<=>?@[]^_{|}~a-zA-Z0-9-'"  # without spaces and " ' ` \
 alias rand-all="rand '[:graph:]'"                           # without spaces
 alias rand-base64="rand 'A-Za-z0-9+/'"
 
