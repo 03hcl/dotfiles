@@ -1,0 +1,26 @@
+#!/bin/bash
+
+IFS=$'\n'
+delimiter="|"
+
+results=()
+
+for row in $(IFS=$'\n'; nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader | awk -F ", " -v "OFS=${delimiter}" "{print \$1,\$2}"); do
+    pid=$(cut -d "${delimiter}" -f 1 <<< "${row}")
+    dockerps=$(docker ps --no-trunc --all | grep "$(grep docker /proc/"${pid}"/cgroup | head -n 1 | cut -d":" -f3 | cut -d"/" -f3)")
+    container_id=$(awk "{print \$1}" <<< "${dockerps}")
+    root_pid=$(pgrep -f "${container_id}.*containerd.sock$")
+    # shellcheck disable=SC2009
+    row_result=$(printf '{"image_name": "%s", "gpu_memory": "%s", "process_pid": "%s", "container_id": "%s", "root_pid": "%s", "expected_user": "%s"}' \
+        "$(awk "{print \$2}" <<< "${dockerps}")" \
+        "$(cut -d "${delimiter}" -f 2 <<< "${row}")" \
+        "${pid}" \
+        "${container_id}" \
+        "${root_pid}" \
+        "$(ps axfo pid,user,command | grep -A 1 -e "^${root_pid}" | grep "\\\_" | awk "{print \$2}")" \
+    )
+    results+=("${row_result}")
+done
+
+# echo "$(IFS=,; echo ["${results[*]}"])"
+echo "$(IFS=,; echo ["${results[*]}"])" | jq
