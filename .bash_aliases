@@ -7,7 +7,7 @@ alias less="less -iJKMNqRW -x4"
 
 df-sort() { df -H -T | awk 'NR == 1 {print $0; next} {print $0 | "sort -k '"$1"'"}'; }
 du1() { du -h -d 1 | sort -hr; }
-rand() { tr -dc "$1" < "/dev/urandom" | fold -w "$2" | head -n 1; }
+rand() { tr -dc "$1" 2>/dev/null < "/dev/urandom" | head -c "$2"; }
 
 alias df7="df-sort 7"
 alias nemui="echo 'ねむい'"
