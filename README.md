@@ -30,4 +30,6 @@ mv .bashrc .orig
 
 git reset --mixed origin/main
 git checkout .
+
+init-dotfiles
 ```

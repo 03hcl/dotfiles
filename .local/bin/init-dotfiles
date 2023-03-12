@@ -1,0 +1,25 @@
+#!/bin/bash
+
+kernel=$(uname -s)
+
+if [ "${kernel}" != "Linux" ]; then
+    echo "Not supported on ${kernel}."
+    exit 1
+fi
+
+# Install yq
+
+architecture=$(uname -m)
+
+case "${architecture}" in
+    "x86_64" | "amd64") yq_binary_name="yq_linux_amd64" ;;
+    *) echo "Not supported on ${architecture} architecture." ;;
+esac
+
+if [ -n "${yq_binary_name}" ]; then
+    yq_version="latest"
+    yq_url="https://github.com/mikefarah/yq/releases/${yq_version}/download/${yq_binary_name}"
+    yq_path="${HOME}/.local/bin/yq"
+    wget -O "${yq_path}" "${yq_url}"
+    chmod +x "${yq_path}"
+fi

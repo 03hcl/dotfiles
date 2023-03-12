@@ -13,5 +13,6 @@
 /.local/*
 !/.local/bin
 /.local/bin/*
-!/.local/bin/hadolint
 !/.local/bin/fetch-gpu-containers
+!/.local/bin/hadolint
+!/.local/bin/init-dotfiles
