@@ -17,13 +17,31 @@ is_available() {
 
 # Setup .gitconfig
 
-is_available "git"
-git config --global --add user.name 03
-git config --global --add user.email kntaco03g1@gmail.com
+is_available git
+
+set_gitconfig() {
+    key="$1"
+    expected="$2"
+    shift 2
+
+    actual=$(git config "$@" --get "${key}")
+
+    if [ -z "${actual}" ]; then
+        git config "$@" --add "${key}" "${expected}"
+        echo "set -> ${expected}"
+    else
+        echo "already set: ${actual}"
+    fi
+}
+
+set_gitconfig user.name 03 --global
+set_gitconfig user.email kntaco03g1@gmail.com --global
 
 # Install yq
 
 if ! is_available yq; then
+    is_available wget
+
     architecture=$(uname -m)
 
     case "${architecture}" in
