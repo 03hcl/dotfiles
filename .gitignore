@@ -16,3 +16,4 @@
 !/.local/bin/fetch-gpu-containers
 !/.local/bin/hadolint
 !/.local/bin/init-dotfiles
+!/.local/bin/smb-format
