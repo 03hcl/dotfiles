@@ -7,19 +7,35 @@ if [ "${kernel}" != "Linux" ]; then
     exit 1
 fi
 
+is_available() {
+    if ! type "${1}" >/dev/null 2>&1; then
+        echo "'${1}' command could not be found. Please install it."
+        exit 1
+    fi
+    echo "'${1}' command is available."
+}
+
+# Setup .gitconfig
+
+is_available "git"
+git config --global --add user.name 03
+git config --global --add user.email kntaco03g1@gmail.com
+
 # Install yq
 
-architecture=$(uname -m)
+if ! is_available yq; then
+    architecture=$(uname -m)
 
-case "${architecture}" in
+    case "${architecture}" in
     "x86_64" | "amd64") yq_binary_name="yq_linux_amd64" ;;
     *) echo "Not supported on ${architecture} architecture." ;;
-esac
+    esac
 
-if [ -n "${yq_binary_name}" ]; then
-    yq_version="latest"
-    yq_url="https://github.com/mikefarah/yq/releases/${yq_version}/download/${yq_binary_name}"
-    yq_path="${HOME}/.local/bin/yq"
-    wget -O "${yq_path}" "${yq_url}"
-    chmod +x "${yq_path}"
+    if [ -n "${yq_binary_name}" ]; then
+        yq_version="latest"
+        yq_url="https://github.com/mikefarah/yq/releases/${yq_version}/download/${yq_binary_name}"
+        yq_path="${HOME}/.local/bin/yq"
+        wget -O "${yq_path}" "${yq_url}"
+        chmod +x "${yq_path}"
+    fi
 fi
