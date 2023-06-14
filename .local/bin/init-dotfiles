@@ -39,13 +39,14 @@ set_gitconfig user.email kntaco03g1@gmail.com --global
 
 # Install yq
 
-if ! is_available yq; then
+if !(is_available yq); then
     is_available wget
 
     architecture=$(uname -m)
 
     case "${architecture}" in
     "x86_64" | "amd64") yq_binary_name="yq_linux_amd64" ;;
+    "armv7l") yq_binary_name="yq_linux_arm";;
     *) echo "Not supported on ${architecture} architecture." ;;
     esac
 
