@@ -5,8 +5,8 @@ input="$*"
 if [ "${input:0:2}" = "\\\\" ]; then
     win="${input}"
     # Convert from '\\example.com\a\b\c' to 'smb://example.com/a/b/c'
-    mac="${win//\\/\/}"
-    mac="${mac/\/\//smb:\/\/}"
+    mac="${win//\\//}"
+    mac="${mac/\/\//smb://}"
 elif [ "${input:0:6}" = "smb://" ]; then
     mac="${input}"
     # Convert from 'smb://example.com/a/b/c' to '\\example.com\a\b\c'
