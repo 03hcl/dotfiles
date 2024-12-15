@@ -4,7 +4,7 @@ Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-function Write-Log ([string]$Message, [string]$Level = "INFO") {
+function Write-Log ([string]$Message = "", [string]$Level = "INFO") {
     $level, $levelColor = switch (${Level}) {
         # NOTSET
         # TRACE
@@ -24,10 +24,11 @@ function Write-Log ([string]$Message, [string]$Level = "INFO") {
 }
 
 function Write-Step ([int]$Step, [string]$Name) {
+    Write-Log
     Write-Log ("=" * 72)
     Write-Log "Step ${Step}: ${Name}"
     Write-Log ("=" * 72)
-    Write-Log ("")
+    Write-Log
 }
 
 function Write-Command-Log ([ScriptBlock]$Script, [bool]$DirectOutput = $false, [string]$Level = "INFO") {
@@ -144,6 +145,7 @@ function Main {
     Step2
     Step3 "${remoteRepoPath}" "${localRepoPath}"
 
+    Write-Log
     Write-Log ("=" * 72)
     Write-Log "Successfully completed!"
     Write-Log ("=" * 72)
