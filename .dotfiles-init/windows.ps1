@@ -87,7 +87,7 @@ function Step2 {
 }
 
 function Update-LocalRepo ([string]$Remote, [string]$local, [string]$Origin, [string]$Branch) {
-    if (-not (Test-Path "${Local}\.git")) { return $false }
+    if (-not (Test-Path "$(Join-Path "${Local}" ".git")")) { return $false }
     if ((git -C "${Local}" remote get-url "${Origin}") -ne "${Remote}") { return $false }
 
     $actualBranch = git -C "${Local}" branch -vv | Where-Object { $_.Contains("[${Origin}/${Branch}]") }
@@ -107,7 +107,9 @@ function Update-LocalRepo ([string]$Remote, [string]$local, [string]$Origin, [st
 }
 
 function Backup-LocalRepo ([string]$src) {
-    $dst = ("{0}-backup\{1:yyyyMMdd_HHmmss}\{2}" -f "${src}", (Get-Date), (Split-Path "${src}" -Leaf))
+    # NOTE: `Join-Path a b c` syntax is not supported in PowerShell < 7.0
+    $dst = Join-Path "${src}-backup" (Get-Date -Format "yyyyMMdd_HHmmss")
+    $dst = Join-Path "${dst}" (Split-Path "${src}" -Leaf)
 
     Write-Log " -> Failed to update dotfiles repo. Backing up the directory."
     Write-Log "        Source: ``${src}``"
@@ -148,7 +150,7 @@ function Main {
     Write-Log "Hello, Windows!"
 
     $remoteRepoPath = "https://github.com/03hcl/dotfiles.git"
-    $localRepoPath = "${HOME}\.dotfiles"
+    $localRepoPath = Join-Path "${env:UserProfile}" ".dotfiles"
 
     Step1
     Step2
