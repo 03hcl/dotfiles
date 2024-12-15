@@ -137,7 +137,7 @@ function Get-RemoteRepo ([string]$Remote, [string]$Local, [string]$Origin, [stri
     git clone "${Remote}" "${Local}" --origin "${Origin}" --branch "${Branch}"
 }
 
-function Step3 ([string]$Remote, [string]$Local, [string]$Origin = "origin", [string]$Branch = "feat/win11") {
+function Step3 ([string]$Remote, [string]$Local, [string]$Origin = "origin", [string]$Branch = "main") {
     Write-Step 3 "Clone 03hcl/dotfiles Repository"
 
     if (Test-Path "${Local}") {
