@@ -86,7 +86,7 @@ function Step2 {
     Write-Command-Log { git --version }
 }
 
-function Update-LocalRepo ([string]$Remote, [string]$local, [string]$Origin, [string]$Branch) {
+function Update-LocalRepo ([string]$Remote, [string]$Local, [string]$Origin, [string]$Branch) {
     if (-not (Test-Path "$(Join-Path "${Local}" ".git")")) { return $false }
     if ((git -C "${Local}" remote get-url "${Origin}") -ne "${Remote}") { return $false }
 
@@ -106,17 +106,17 @@ function Update-LocalRepo ([string]$Remote, [string]$local, [string]$Origin, [st
     return $true
 }
 
-function Backup-LocalRepo ([string]$src) {
+function Backup-Directory ([string]$LocalRepo, [string]$Source) {
     # NOTE: `Join-Path a b c` syntax is not supported in PowerShell < 7.0
-    $dst = Join-Path "${src}-backup" (Get-Date -Format "yyyyMMdd_HHmmss")
-    $dst = Join-Path "${dst}" (Split-Path "${src}" -Leaf)
+    $target = Join-Path "${LocalRepo}-backup" (Get-Date -Format "yyyyMMdd_HHmmss")
+    $target = Join-Path "${target}" (Split-Path "${Source}" -Leaf)
 
-    Write-Log " -> Failed to update dotfiles repo. Backing up the directory."
-    Write-Log "        Source: ``${src}``"
-    Write-Log "        Target: ``${dst}``"
+    Write-Log " -> Failed to update source directory. Backing up to target directory."
+    Write-Log "        Source: ``${Source}``"
+    Write-Log "        Target: ``${target}``"
     $response = Read-Host "Confirm backup? [y/N]"
 
-    if ($response -ine "y") {
+    if ("${response}" -ine "y") {
         Write-Log " -> Aborted."
         throw "Aborted by user."
     }
@@ -129,7 +129,9 @@ function Backup-LocalRepo ([string]$src) {
     Write-Log " -> Backup completed."
 }
 
-function Get-RemoteRepo ([string]$Remote, [string]$local, [string]$Origin = "origin", [string]$Branch = "feat/win11") {
+function Backup-LocalRepo ([string]$Local) { Backup-Directory "${Local}" "${Local}" }
+
+function Get-RemoteRepo ([string]$Remote, [string]$Local, [string]$Origin, [string]$Branch) {
     if (Test-Path "${Local}") { return }
     Write-Log " -> Clone repository."
     git clone "${Remote}" "${Local}" --origin "${Origin}" --branch "${Branch}"
