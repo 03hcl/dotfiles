@@ -146,7 +146,25 @@ function Step3 ([string]$Remote, [string]$Local, [string]$Origin = "origin", [st
     Get-RemoteRepo "${Remote}" "${Local}" "${Origin}" "${Branch}"
 }
 
-function Main {
+function Step4 ([string]$Local) {
+    Write-Step 4 "Search Additional Steps"
+
+    $steps = Get-ChildItem (Join-Path "${Local}" ".dotfiles-init") -Filter "step*" -Directory | Sort-Object
+
+    if (${steps}) {
+        Write-Log ($steps | Format-Table -AutoSize | Out-String)
+        Write-Log (" -> Found $(${steps}.Count) additional steps.")
+    }
+    else { Write-Log " -> No additional steps found." }
+
+    foreach ($step in ${steps}) {
+        $file = Join-Path ${step}.FullName "windows.ps1"
+        if (-not (Test-Path "${file}")) { continue }
+        . ${file}
+    }
+}
+
+function Initialize-Dotfiles {
     Write-Log "Hello, Windows!"
 
     $remoteRepoPath = "https://github.com/03hcl/dotfiles.git"
@@ -156,6 +174,7 @@ function Main {
     Step2
     Import-Path
     Step3 "${remoteRepoPath}" "${localRepoPath}"
+    Step4 "${localRepoPath}"
 
     Write-Log
     Write-Log ("=" * 72)
@@ -163,6 +182,4 @@ function Main {
     Write-Log ("=" * 72)
 }
 
-if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -eq ${PSCommandPath})) {
-    Main -Args $args
-}
+if (-not ${MyInvocation}.ScriptName) { Initialize-Dotfiles -Args $args }
