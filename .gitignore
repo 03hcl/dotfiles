@@ -18,6 +18,7 @@
 !/.local/bin/init-dotfiles
 !/.local/bin/smb-format
 
-!/init
-/init/*
-!/init/windows.ps1
+!/.dotfiles-init
+/.dotfiles-init/*
+!/.dotfiles-init/README.md
+!/.dotfiles-init/windows.ps1
