@@ -40,6 +40,14 @@ function Write-Command-Log ([ScriptBlock]$Script, [bool]$DirectOutput = $false, 
     else { Write-Log (& ${Script} | Out-String) "${Level}" }
 }
 
+function Import-Path {
+    $env:Path = (
+        [System.Environment]::GetEnvironmentVariable("Path", "Machine") +
+        ";" +
+        [System.Environment]::GetEnvironmentVariable("Path", "User")
+    )
+}
+
 function Step1 {
     Write-Step 1 "Show Environment Information"
 
@@ -69,11 +77,12 @@ function Update-WinGetPackage([string]$Id, [string]$Source = "winget", [string]$
 }
 
 function Step2 {
-    Write-Step 2 "Install Latest Softwares (WinGet, Git Client)"
-
+    # Write-Step 2 "Install Latest Softwares (WinGet, Git Client)"
     # TODO: Update WinGet itself (<https://github.com/microsoft/winget-cli>)
 
+    Write-Step 2 "Install Latest Git Client"
     Update-WinGetPackage "Git.Git"
+
     Write-Command-Log { git --version }
 }
 
@@ -143,6 +152,7 @@ function Main {
 
     Step1
     Step2
+    Import-Path
     Step3 "${remoteRepoPath}" "${localRepoPath}"
 
     Write-Log
