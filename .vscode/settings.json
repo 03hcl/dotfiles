@@ -1,4 +1,18 @@
 {
+  "[markdown]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+    },
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+    "editor.formatOnSave": true,
+    "editor.quickSuggestions": {
+      "comments": "on",
+      "strings": "on",
+      "other": "on"
+    },
+    "editor.unicodeHighlight.invisibleCharacters": true,
+  },
+
   "cSpell.caseSensitive": false,
   "cSpell.customDictionaries": {
     "project-words": {
@@ -11,6 +25,14 @@
   },
   "cSpell.diagnosticLevel": "Warning",
   "cSpell.enabled": true,
+
+  "markdownlint.config": {
+    // "MD004": { "style": "consistent" },
+    // "MD004": { "style": "sublist" },
+    "MD024": { "siblings_only": true },
+    // "MD025": { "level": 2 },
+    "MD033": { "allowed_elements": [ "details", "summary" ] },
+  },
 
   "python.defaultInterpreterPath": "${workspaceRoot}/../.dotfiles-ansible/Scripts/python.exe",
 }
