@@ -23,6 +23,7 @@
 !/.dotfiles-init/README.md
 !/.dotfiles-init/windows.ps1
 !/.dotfiles-init/step005_install_salt
+!/.dotfiles-init/step006_install_python
 
 !/.vscode
 /.vscode/*
