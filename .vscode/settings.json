@@ -1,0 +1,15 @@
+{
+  "cSpell.caseSensitive": false,
+  "cSpell.customDictionaries": {
+    "project-words": {
+      "name": "project-words",
+      "path": "${workspaceRoot}/.vscode/project-words.md",
+      "addWords": true,
+    },
+    "custom": true,
+    "internal-terms": false,
+  },
+  "cSpell.enabled": true,
+
+  "python.defaultInterpreterPath": "${workspaceRoot}/../.dotfiles-ansible/Scripts/python.exe",
+}

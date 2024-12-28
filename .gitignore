@@ -22,3 +22,9 @@
 /.dotfiles-init/*
 !/.dotfiles-init/README.md
 !/.dotfiles-init/windows.ps1
+
+!/.vscode
+/.vscode/*
+!/.vscode/extensions.json
+!/.vscode/project-words.md
+!/.vscode/settings.json
