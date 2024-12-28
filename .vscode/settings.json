@@ -9,6 +9,7 @@
     "custom": true,
     "internal-terms": false,
   },
+  "cSpell.diagnosticLevel": "Warning",
   "cSpell.enabled": true,
 
   "python.defaultInterpreterPath": "${workspaceRoot}/../.dotfiles-ansible/Scripts/python.exe",

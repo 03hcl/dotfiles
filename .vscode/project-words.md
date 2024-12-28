@@ -18,3 +18,9 @@ WinGet
 ```plaintext
 venv
 ```
+
+## CLI tools
+
+```plaintext
+hadolint
+```
