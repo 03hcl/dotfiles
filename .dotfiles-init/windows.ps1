@@ -82,6 +82,7 @@ function Step2 {
 
     Write-Step 2 "Install Latest Git Client"
     Update-WinGetPackage "Git.Git"
+    Import-Path
 
     Write-Command-Log { git --version }
 }
@@ -174,7 +175,6 @@ function Initialize-Dotfiles {
 
     Step1
     Step2
-    Import-Path
     Step3 "${remoteRepoPath}" "${localRepoPath}"
     Step4 "${localRepoPath}"
 
