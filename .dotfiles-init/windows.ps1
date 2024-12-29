@@ -157,6 +157,7 @@ function Step4 ([string]$Local) {
     if (${steps}) {
         Write-Log ($steps | Format-Table -AutoSize | Out-String)
         Write-Log (" -> Found $(${steps}.Count) additional steps.")
+        Set-ExecutionPolicy -ExecutionPolicy "RemoteSigned" -Scope "Process"
     }
     else { Write-Log " -> No additional steps found." }
 
