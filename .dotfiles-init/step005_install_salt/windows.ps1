@@ -12,7 +12,7 @@ function Step5 {
     Update-WinGetPackage "SaltStack.SaltMinion"
     Import-Path
 
-    Write-Command-Log { salt-call grains.items }
+    # Write-Command-Log { salt-call grains.items }
 }
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne ${PSCommandPath})) {

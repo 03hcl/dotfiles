@@ -24,6 +24,8 @@
 !/.dotfiles-init/windows.ps1
 !/.dotfiles-init/step005_install_salt
 !/.dotfiles-init/step006_install_python
+!/.dotfiles-init/step007_upgrade_winget
+!/.dotfiles-init/step008_install_vs_code
 
 !/.vscode
 /.vscode/*
