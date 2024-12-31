@@ -27,8 +27,9 @@ function Step6 {
     Write-Command-Log { pip3 --version }
     Write-Command-Log { pip3.12 --version }
 
-    Write-Command-Log { pip list }
     Write-Command-Log { pip install --upgrade uv }
+
+    Write-Command-Log { uv pip list --system }
 }
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
