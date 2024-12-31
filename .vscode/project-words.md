@@ -44,6 +44,7 @@ venv
 
 ```plaintext
 hadolint
+markitdown
 ```
 
 ## VS Code

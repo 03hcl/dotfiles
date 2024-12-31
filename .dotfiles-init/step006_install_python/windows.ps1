@@ -29,7 +29,10 @@ function Step6 {
 
     Write-CommandLog { pip install --upgrade uv }
 
+    Write-CommandLog { uv pip install --system --upgrade markitdown }
+
     Write-CommandLog { uv pip list --system }
+    # Write-CommandLog { markitdown --version }
 }
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
