@@ -30,6 +30,12 @@ function Update-ExecutionPolicy {
     Write-CommandLog { Get-ExecutionPolicy -List }
 }
 
+function Install-BusyBox {
+    Update-WinGetPackage "frippery.busybox-w32"
+    Import-Path
+    Write-CommandLog { busybox | busybox head -n 2 }
+}
+
 function Step9 {
     Write-Step 9 "Setup PowerShell"
 
@@ -42,6 +48,8 @@ function Step9 {
     # Write-CommandLog { Get-ChildItem "${env:APPDATA}\Microsoft\Windows\PowerShell\PSReadLine" }
     # Write-CommandLog { Get-PSReadLineOption }
     # Write-CommandLog { Get-PSReadLineKeyHandler }
+
+    Install-BusyBox
 }
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
