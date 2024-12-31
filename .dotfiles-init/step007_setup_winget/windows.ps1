@@ -5,16 +5,8 @@ $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 function Update-SettingsJson {
-    $source = "$(Join-Path (Split-Path ${PSCommandPath}) "settings.json")"
     $target = "${env:LOCALAPPDATA}\Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState\settings.json"
-
-    Write-Log "Copy 'settings.json' ..."
-    Write-Log "    from:   ${source}"
-    Write-Log "    to:     ${target}"
-
-    Copy-Item -Path "${source}" -Destination "${target}" -Force
-
-    Write-Log " -> Copied."
+    Copy-Resource -Source "settings.json" -Target "${target}"
 }
 
 function Step7 {

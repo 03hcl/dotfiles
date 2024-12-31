@@ -10,6 +10,20 @@ function Invoke-WithoutProgress ([ScriptBlock]$Script)
     $ProgressPreference = "${pref}"
 }
 
+function Copy-Resource ([string]$Source, [string]$Target, [string]$TargetDir, [string]$TargetName = "${Source}") {
+    $sourcePath = "$(Join-Path (Split-Path "$((Get-PSCallStack)[1].ScriptName)") "${Source}")"
+
+    if (-not "${Target}") { $Target = "$(Join-Path "${TargetDir}" "${TargetName}")" }
+
+    Write-Log "Copy '${Source}' ..."
+    Write-Log "    from:   ${sourcePath}"
+    Write-Log "    to:     ${target}"
+
+    Copy-Item -Path "${sourcePath}" -Destination "${target}" -Force
+
+    Write-Log " -> Copied."
+}
+
 function Get-LatestGitHubAsset ([string]$Owner, [string]$Repo, [string]$AssetName, [string]$TargetDir) {
     if (-not "${TargetDir}") { $TargetDir = "${env:TEMP}" }
 

@@ -65,17 +65,8 @@ function Update-GitAttributes {
     $attrs = @(Get-GitVariables GIT_ATTR_GLOBAL)
     Remove-GitPaths -Paths $attrs
 
-    $source = "$(Join-Path (Split-Path "${PSCommandPath}") ".gitattributes")"
-    $target = $attrs[0]
-
     Write-Log
-    Write-Log "Copy '.gitattributes' ..."
-    Write-Log "    from:   ${source}"
-    Write-Log "    to:     ${target}"
-
-    Copy-Item -Path "${source}" -Destination "${target}"
-
-    Write-Log " -> Copied."
+    Copy-Resource -Source ".gitattributes" -Target $attrs[0]
 }
 
 # Reference: https://git-scm.com/docs/gitignore
@@ -84,19 +75,10 @@ function Update-GitIgnore {
     Write-Log ("-" * 72)
     Write-Log
 
-    $target = "${env:UserProfile}\.config\git\ignore"
-    Remove-GitPaths -Paths @($target)
+    # Remove-GitPaths -Paths @("${env:UserProfile}\.config\git\ignore")
 
-    $source = "$(Join-Path (Split-Path "${PSCommandPath}") ".gitignore_global")"
-
-    Write-Log
-    Write-Log "Copy '.gitignore_global' ..."
-    Write-Log "    from:   ${source}"
-    Write-Log "    to:     ${target}"
-
-    Copy-Item -Path "${source}" -Destination "${target}"
-
-    Write-Log " -> Copied."
+    # Write-Log
+    Copy-Resource -Source ".gitignore_global" -Target "${env:UserProfile}\.config\git\ignore"
 }
 
 function Step5 {
