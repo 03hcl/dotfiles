@@ -4,6 +4,7 @@
   // For documentation on these settings, see:
   // - https://aka.ms/winget-settings
   // - https://github.com/microsoft/winget-cli/blob/master/doc/Settings.md
+  // - https://learn.microsoft.com/ja-jp/windows/package-manager/winget/settings
 
   "experimentalFeatures": {
     "configuration03": true,
