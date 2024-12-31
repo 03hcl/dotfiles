@@ -22,6 +22,7 @@
 /.dotfiles-init/*
 !/.dotfiles-init/README.md
 !/.dotfiles-init/windows.ps1
+!/.dotfiles-init/step005_setup_git
 !/.dotfiles-init/step006_install_python
 !/.dotfiles-init/step007_upgrade_winget
 !/.dotfiles-init/step008_install_vs_code
