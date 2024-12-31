@@ -22,10 +22,12 @@
 /.dotfiles-init/*
 !/.dotfiles-init/README.md
 !/.dotfiles-init/windows.ps1
+!/.dotfiles-init/windows_utils.psm1
 !/.dotfiles-init/step005_setup_git
 !/.dotfiles-init/step006_install_python
 !/.dotfiles-init/step007_setup_winget
 !/.dotfiles-init/step008_install_vs_code
+!/.dotfiles-init/step009_setup_powershell
 
 !/.vscode
 /.vscode/*
