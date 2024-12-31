@@ -24,8 +24,8 @@ function Remove-GitPaths ([string[]]$Paths) {
 }
 
 function Set-GitConfig ([string]$Path) {
-    New-Item (Split-Path "${Path}") -ItemType "Directory" -Force
-    New-Item -Path "${Path}"
+    New-Item (Split-Path "${Path}") -ItemType "Directory" -Force > $null
+    New-Item -Path "${Path}" > $null
 
     $gitArgs = @("config", "set", "--file", "${Path}")
 
@@ -59,8 +59,11 @@ function Update-GitConfig {
 
 # Reference: https://git-scm.com/docs/gitattributes
 function Update-GitAttributes {
-    $attrs = @(Get-GitVariables GIT_ATTR_GLOBAL)
+    Write-Log
+    Write-Log ("-" * 72)
+    Write-Log
 
+    $attrs = @(Get-GitVariables GIT_ATTR_GLOBAL)
     Remove-GitPaths -Paths $attrs
 
     $source = "$(Join-Path (Split-Path "${PSCommandPath}") ".gitattributes")"
@@ -78,8 +81,11 @@ function Update-GitAttributes {
 
 # Reference: https://git-scm.com/docs/gitignore
 function Update-GitIgnore {
-    $target = "${env:UserProfile}\.config\git\ignore"
     Write-Log
+    Write-Log ("-" * 72)
+    Write-Log
+
+    $target = "${env:UserProfile}\.config\git\ignore"
     Remove-GitPaths -Paths @($target)
 
     $source = "$(Join-Path (Split-Path "${PSCommandPath}") ".gitignore_global")"
