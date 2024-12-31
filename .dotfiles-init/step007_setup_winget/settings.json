@@ -1,0 +1,53 @@
+{
+  "$schema": "https://aka.ms/winget-settings.schema.json",
+
+  // For documentation on these settings, see:
+  // - https://aka.ms/winget-settings
+  // - https://github.com/microsoft/winget-cli/blob/master/doc/Settings.md
+
+  "experimentalFeatures": {
+    "configuration03": true,
+    "configureSelfElevate": true,
+    "configureExport": true,
+    "dependencies": true,
+    "directMSI": true,
+    "resume": true,
+    "zipInstall": false
+  },
+
+  "installBehavior": {
+    // "defaultInstallRoot": "...",
+    "disableInstallNotes": true,
+    // "maxResumes": 3,
+    // "portablePackageMachineRoot": "..."
+    // "portablePackageUserRoot": "..."
+    "preferences": {
+      "locale": [ "ja-JP", "en-US" ],
+      "scope": "user"
+    },
+    // "requirements": { ... },
+    "skipDependencies": false
+  },
+
+  "interactivity": { "disable": false },
+
+  "logging": {
+    "channels": ["default"],
+    "level": "info"
+  },
+
+  "network": {
+    "doProgressTimeoutInSeconds": 60,
+    "downloader": "do"
+  },
+
+  "source": { "autoUpdateIntervalInMinutes": 5 },
+
+  "telemetry": { "disable": true },
+
+  "visual": {
+    "anonymizeDisplayedPaths": true,
+    "enableSixels": true,
+    "progressBar": "sixel"
+  }
+}
