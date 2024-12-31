@@ -12,8 +12,7 @@ function Update-SettingsJson {
     Write-Log "    from:   ${source}"
     Write-Log "    to:     ${target}"
 
-    New-Item (Split-Path "${target}") -ItemType "Directory" -Force > $null
-    Copy-Item -Path "${source}" -Destination "${target}"
+    Copy-Item -Path "${source}" -Destination "${target}" -Force
 
     Write-Log " -> Copied."
 }

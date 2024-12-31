@@ -24,8 +24,7 @@ function Remove-GitPaths ([string[]]$Paths) {
 }
 
 function Set-GitConfig ([string]$Path) {
-    New-Item (Split-Path "${Path}") -ItemType "Directory" -Force > $null
-    New-Item -Path "${Path}" > $null
+    New-Item -Path "${Path}" -Force > $null
 
     $gitArgs = @("config", "set", "--file", "${Path}")
 
