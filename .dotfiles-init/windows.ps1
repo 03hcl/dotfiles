@@ -31,12 +31,12 @@ function Write-Step ([int]$Step, [string]$Name) {
     Write-Log
 }
 
-function Write-CommandLog ([ScriptBlock]$Script, [bool]$DirectOutput = $false, [string]$Level = "INFO") {
+function Write-CommandLog ([ScriptBlock]$Script, [bool]$IsDirectOutput = $false, [string]$Level = "INFO") {
     Write-Log ("-" * 72) "${Level}"
     Write-Log (" -> Command: ``$($Script.ToString().Trim())``") "${Level}"
     Write-Log ("-" * 72) "${Level}"
 
-    if (${DirectOutput}) { & ${Script} }
+    if (${IsDirectOutput}) { & ${Script} }
     else { Write-Log (& ${Script} | Out-String) "${Level}" }
 }
 
@@ -64,7 +64,7 @@ function Step1 {
 
 function Update-WinGetPackage([string]$Id, [string]$Source = "winget", [string]$Scope = "") {
     # $command = "winget list --source '${Source}' --id '${Id}'"
-    # $installed = Write-CommandLog ([ScriptBlock]::Create($command)) -DirectOutput $true | Select-String '^[-]+$'
+    # $installed = Write-CommandLog ([ScriptBlock]::Create($command)) -IsDirectOutput $true | Select-String '^[-]+$'
 
     # if (${installed}) { $subcommand = "upgrade" }
     # else { $subcommand = "install" }
@@ -73,7 +73,7 @@ function Update-WinGetPackage([string]$Id, [string]$Source = "winget", [string]$
     # $command = "winget ${subcommand} --silent --exact --source '${Source}' --id '${Id}'"
     if (${Scope}) { $command += " --scope ${Scope}" }
 
-    Write-CommandLog ([ScriptBlock]::Create(${command})) -DirectOutput $true
+    Write-CommandLog ([ScriptBlock]::Create(${command})) -IsDirectOutput $true
 }
 
 function Step2 {
@@ -140,8 +140,8 @@ function Step3 ([string]$Remote, [string]$Local, [string]$Origin = "origin", [st
     Write-Step 3 "Clone 03hcl/dotfiles Repository"
 
     if (Test-Path "${Local}") {
-        $updated = Update-LocalRepo "${Remote}" "${Local}" "${Origin}" "${Branch}"
-        if (-not ${updated}) { Backup-LocalRepo "${Local}" }
+        $isUpdated = Update-LocalRepo "${Remote}" "${Local}" "${Origin}" "${Branch}"
+        if (-not ${isUpdated}) { Backup-LocalRepo "${Local}" }
     }
 
     Get-RemoteRepo "${Remote}" "${Local}" "${Origin}" "${Branch}"
