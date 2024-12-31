@@ -31,7 +31,7 @@ function Step6 {
     Write-Command-Log { pip install --upgrade uv }
 }
 
-if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne ${PSCommandPath})) {
-    . (Join-Path (Split-Path (Split-Path ${PSCommandPath})) "windows.ps1")
+if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
+    Import-Module -Name "$(Join-Path ("${PSCommandPath}" | Split-Path | Split-Path) "windows_utils.psm1")" -Force
     Step6 -Args $args
 }
