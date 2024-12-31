@@ -4,6 +4,7 @@ Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
+# Reference: https://git-scm.com/docs/git-var
 function Get-GitVariables ([string]$Var) {
     return git var "${Var}" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
 }
@@ -39,6 +40,7 @@ function Set-GitConfig ([string]$Path) {
     git @gitArgs rerere.enabled true
 }
 
+# Reference: https://git-scm.com/docs/git-config
 function Update-GitConfig {
     $paths = @(Get-GitVariables GIT_CONFIG_GLOBAL)
     Remove-GitPaths -Paths $paths
@@ -55,6 +57,7 @@ function Update-GitConfig {
     # }
 }
 
+# Reference: https://git-scm.com/docs/gitattributes
 function Update-GitAttributes {
     $attrs = @(Get-GitVariables GIT_ATTR_GLOBAL)
 
@@ -73,6 +76,7 @@ function Update-GitAttributes {
     Write-Log " -> Copied."
 }
 
+# Reference: https://git-scm.com/docs/gitignore
 function Update-GitIgnore {
     $target = "${env:UserProfile}\.config\git\ignore"
     Write-Log
@@ -91,7 +95,7 @@ function Update-GitIgnore {
 }
 
 function Step5 {
-    Write-Step 5 "Setup Git Config"
+    Write-Step 5 "Setup Git"
 
     Update-GitConfig
     Update-GitAttributes
