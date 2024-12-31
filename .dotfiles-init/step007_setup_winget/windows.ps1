@@ -22,7 +22,7 @@ function Step7 {
     Write-Step 7 "Setup WinGet"
 
     Update-WinGetPackage "Microsoft.AppInstaller"
-    Write-Command-Log { winget --version }
+    Write-CommandLog { winget --version }
 
     Update-SettingsJson
 }

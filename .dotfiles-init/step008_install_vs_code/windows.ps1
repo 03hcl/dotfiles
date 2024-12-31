@@ -10,7 +10,7 @@ function Step8 {
     Update-WinGetPackage "Microsoft.VisualStudioCode"
     Import-Path
 
-    Write-Command-Log { code --version }
+    Write-CommandLog { code --version }
 
     Write-Step 8 "Install Extensions for Visual Studio Code"
 

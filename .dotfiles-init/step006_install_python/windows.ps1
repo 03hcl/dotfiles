@@ -20,16 +20,16 @@ function Step6 {
     Remove-AppAlias "python3.exe"
     Import-Path
 
-    Write-Command-Log { python --version }
-    Write-Command-Log { py -3.12 --version }
+    Write-CommandLog { python --version }
+    Write-CommandLog { py -3.12 --version }
 
-    Write-Command-Log { pip --version }
-    Write-Command-Log { pip3 --version }
-    Write-Command-Log { pip3.12 --version }
+    Write-CommandLog { pip --version }
+    Write-CommandLog { pip3 --version }
+    Write-CommandLog { pip3.12 --version }
 
-    Write-Command-Log { pip install --upgrade uv }
+    Write-CommandLog { pip install --upgrade uv }
 
-    Write-Command-Log { uv pip list --system }
+    Write-CommandLog { uv pip list --system }
 }
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {

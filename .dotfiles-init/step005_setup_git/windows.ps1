@@ -49,11 +49,11 @@ function Update-GitConfig {
     Set-GitConfig -Path "${path}"
 
     Write-Log
-    Write-Command-Log { git config list --global }
+    Write-CommandLog { git config list --global }
     # foreach ($p in ${paths}) {
     #     Write-Log ("-" * 72)
     #     Write-Log "`$p = `"${p}`""
-    #     Write-Command-Log { git config list "--file" "${p}" }
+    #     Write-CommandLog { git config list "--file" "${p}" }
     # }
 }
 

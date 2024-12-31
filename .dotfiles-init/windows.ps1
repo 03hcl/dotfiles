@@ -31,9 +31,9 @@ function Write-Step ([int]$Step, [string]$Name) {
     Write-Log
 }
 
-function Write-Command-Log ([ScriptBlock]$Script, [bool]$DirectOutput = $false, [string]$Level = "INFO") {
+function Write-CommandLog ([ScriptBlock]$Script, [bool]$DirectOutput = $false, [string]$Level = "INFO") {
     Write-Log ("-" * 72) "${Level}"
-    Write-Log (" -> Command: ``{0}``" -f ${Script}.ToString().Trim()) "${Level}"
+    Write-Log (" -> Command: ``$($Script.ToString().Trim())``") "${Level}"
     Write-Log ("-" * 72) "${Level}"
 
     if (${DirectOutput}) { & ${Script} }
@@ -51,20 +51,20 @@ function Import-Path {
 function Step1 {
     Write-Step 1 "Show Environment Information"
 
-    # Write-Command-Log { Get-ComputerInfo | Format-List }
+    # Write-CommandLog { Get-ComputerInfo | Format-List }
 
-    Write-Command-Log { $PSVersionTable | Format-Table }
-    Write-Command-Log { Get-ExecutionPolicy }
-    Write-Command-Log { chcp }
+    Write-CommandLog { $PSVersionTable | Format-Table }
+    Write-CommandLog { Get-ExecutionPolicy }
+    Write-CommandLog { chcp }
 
-    # Write-Command-Log { Get-Command "winget" | Format-List }
-    # Write-Command-Log { winget --info }
-    Write-Command-Log { winget --version }
+    # Write-CommandLog { Get-Command "winget" | Format-List }
+    # Write-CommandLog { winget --info }
+    Write-CommandLog { winget --version }
 }
 
 function Update-WinGetPackage([string]$Id, [string]$Source = "winget", [string]$Scope = "") {
     # $command = "winget list --source '${Source}' --id '${Id}'"
-    # $installed = Write-Command-Log ([ScriptBlock]::Create($command)) -DirectOutput $true | Select-String '^[-]+$'
+    # $installed = Write-CommandLog ([ScriptBlock]::Create($command)) -DirectOutput $true | Select-String '^[-]+$'
 
     # if (${installed}) { $subcommand = "upgrade" }
     # else { $subcommand = "install" }
@@ -73,18 +73,16 @@ function Update-WinGetPackage([string]$Id, [string]$Source = "winget", [string]$
     # $command = "winget ${subcommand} --silent --exact --source '${Source}' --id '${Id}'"
     if (${Scope}) { $command += " --scope ${Scope}" }
 
-    Write-Command-Log ([ScriptBlock]::Create(${command})) -DirectOutput $true
+    Write-CommandLog ([ScriptBlock]::Create(${command})) -DirectOutput $true
 }
 
 function Step2 {
-    # Write-Step 2 "Install Latest Softwares (WinGet, Git Client)"
-    # TODO: Update WinGet itself (<https://github.com/microsoft/winget-cli>)
-
     Write-Step 2 "Install Latest Git Client"
+
     Update-WinGetPackage "Git.Git"
     Import-Path
 
-    Write-Command-Log { git --version }
+    Write-CommandLog { git --version }
 }
 
 function Update-LocalRepo ([string]$Remote, [string]$Local, [string]$Origin, [string]$Branch) {
