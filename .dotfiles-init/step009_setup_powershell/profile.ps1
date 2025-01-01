@@ -20,4 +20,12 @@ function Set-PSReadLineOptions {
     Set-PSReadLineKeyHandler -Key Ctrl+v -Function Paste
 }
 
+chcp 65001
+
 Set-PSReadLineOptions
+
+""
+"==============================================================================="
+"    Profile created by 03hcl/dotfiles (https://github.com/03hcl/dotfiles/)"
+"==============================================================================="
+""

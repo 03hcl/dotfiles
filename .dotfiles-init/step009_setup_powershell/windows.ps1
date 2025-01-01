@@ -17,7 +17,11 @@ function Update-PowerShell {
 
 function Update-Profile {
     Write-CommandLog { ${PROFILE} | Format-List -Force }
-    Copy-Resource -Source "profile.ps1" -Target ${PROFILE}.CurrentUserAllHosts
+
+    $target = (powershell -NoProfile -Command "`${PROFILE}.CurrentUserAllHosts")
+    Copy-Resource -Source "profile.ps1" -Target "${target}"
+    $target = (pwsh -NoProfile -Command "`${PROFILE}.CurrentUserAllHosts")
+    Copy-Resource -Source "profile.ps1" -Target "${target}"
 }
 
 function Update-ExecutionPolicy {
