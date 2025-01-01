@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 
 function Remove-AppAlias ([string]$FileName) {
     # NOTE: `Join-Path a b c` syntax is not supported in PowerShell < 7.0
-    $filePath = Join-Path "${env:LocalAppData}" "Microsoft"
+    $filePath = Join-Path "${env:LOCALAPPDATA}" "Microsoft"
     $filePath = Join-Path "${filePath}" "WindowsApps"
     $filePath = Join-Path "${filePath}" "${FileName}"
     if (Test-Path "${filePath}") { Remove-Item "${filePath}" }

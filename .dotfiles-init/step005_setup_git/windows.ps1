@@ -33,7 +33,7 @@ function Set-GitConfig ([string]$Path) {
 
     git @gitArgs core.autocrlf input
     git @gitArgs core.editor "code --wait"
-    # git @gitArgs core.excludesfile "${env:UserProfile}\.config\git\ignore"
+    # git @gitArgs core.excludesfile "${env:USERPROFILE}\.config\git\ignore"
     git @gitArgs core.safecrlf true
     git @gitArgs init.defaultBranch main
     git @gitArgs rerere.enabled true
@@ -75,10 +75,10 @@ function Update-GitIgnore {
     Write-Log ("-" * 72)
     Write-Log
 
-    # Remove-GitPaths -Paths @("${env:UserProfile}\.config\git\ignore")
+    # Remove-GitPaths -Paths @("${env:USERPROFILE}\.config\git\ignore")
 
     # Write-Log
-    Copy-Resource -Source ".gitignore_global" -Target "${env:UserProfile}\.config\git\ignore"
+    Copy-Resource -Source ".gitignore_global" -Target "${env:USERPROFILE}\.config\git\ignore"
 }
 
 function Step5 {

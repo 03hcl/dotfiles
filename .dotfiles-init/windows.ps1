@@ -57,6 +57,8 @@ function Step1 {
     Write-CommandLog { Get-ExecutionPolicy }
     Write-CommandLog { chcp }
 
+    Write-CommandLog { Get-ChildItem "env:" }
+
     # Write-CommandLog { Get-Command "winget" | Format-List }
     # Write-CommandLog { winget --info }
     Write-CommandLog { winget --version }
@@ -170,7 +172,7 @@ function Initialize-Dotfiles {
     Write-Log "Hello, Windows!"
 
     $remoteRepoPath = "https://github.com/03hcl/dotfiles.git"
-    $localRepoPath = Join-Path "${env:UserProfile}" ".dotfiles"
+    $localRepoPath = Join-Path "${env:USERPROFILE}" ".dotfiles"
 
     Step1
     Step2
