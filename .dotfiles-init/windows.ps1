@@ -41,7 +41,7 @@ function Write-CommandLog ([ScriptBlock]$Script, [bool]$IsDirectOutput = $false,
 }
 
 function Import-Path {
-    $env:Path = (
+    $env:Path = [System.Environment]::ExpandEnvironmentVariables(
         [System.Environment]::GetEnvironmentVariable("Path", "Machine") +
         ";" +
         [System.Environment]::GetEnvironmentVariable("Path", "User")
