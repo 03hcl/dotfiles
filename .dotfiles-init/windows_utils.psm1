@@ -13,15 +13,72 @@ function Invoke-WithoutProgress ([ScriptBlock]$Script)
 function Copy-Resource ([string]$Source, [string]$Target, [string]$TargetDir, [string]$TargetName = "${Source}") {
     $sourcePath = "$(Join-Path (Split-Path "$((Get-PSCallStack)[1].ScriptName)") "${Source}")"
 
-    if (-not "${Target}") { $Target = "$(Join-Path "${TargetDir}" "${TargetName}")" }
+    if ("${Target}") {
+        $TargetDir = "$(Split-Path "${Target}")"
+        $TargetName = "$(Split-Path "${Target}" -Leaf)"
+    }
+    else { $Target = "$(Join-Path "${TargetDir}" "${TargetName}")" }
 
     Write-Log "Copy '${Source}' ..."
     Write-Log "    from:   ${sourcePath}"
-    Write-Log "    to:     ${target}"
+    Write-Log "    to:     ${Target}"
 
-    Copy-Item -Path "${sourcePath}" -Destination "${target}" -Force
+    New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
+    Copy-Item -Path "${sourcePath}" -Destination "${Target}" -Force
 
     Write-Log " -> Copied."
+}
+
+function Update-Path ([string]$append) {
+    $expanded = [System.Environment]::ExpandEnvironmentVariables("${append}")
+    if ("${expanded}" -in "${env:Path}".Split(';')) { return }
+
+    $current = (Get-ItemProperty "HKCU:\Environment").Path
+    [System.Environment]::SetEnvironmentVariable("Path", "${append};${current}", "User")
+
+    Import-Path
+}
+
+function New-SymLink {
+    param (
+        [string]$Source,
+        [string]$Target,
+        [string]$TargetDir = "${env:USERPROFILE}\.local\bin",
+        [string]$TargetName = "$(Split-Path "${Source}" -Leaf)"
+    )
+
+    if ("${Target}") {
+        $TargetDir = "$(Split-Path "${Target}")"
+        $TargetName = "$(Split-Path "${Target}" -Leaf)"
+    }
+    else { $Target = "$(Join-Path "${TargetDir}" "${TargetName}")" }
+
+    Write-Log "Create a symbolic link of '$(Split-Path "${Source}" -Leaf)' ..."
+    Write-Log "    from:   ${Source}"
+    Write-Log "    to:     ${Target}"
+
+    if (Test-Path "${Target}") {
+        $prop = Get-ItemProperty "${Target}"
+
+        # NOTE: `.LinkTarget` is probably not supported in PowerShell < 7.1
+        # if (${prop} -and (${prop}.LinkTarget -eq "${Source}")) {
+        if (${prop} -and (${prop}.Target -eq "${Source}")) {
+            Write-Log " -> Already exists."
+            return
+        }
+    }
+
+    New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
+
+    # NOTE: Not working on PowerShell 5.1 even with developer mode
+    # New-Item -Path "${Target}" -Value "${Source}" -ItemType "SymbolicLink" -Force
+    Start-Process pwsh -Verb "RunAs" -Wait -ArgumentList @(
+        "-NoProfile",
+        "-Command",
+        "New-Item -Path '${Target}' -Value '${Source}' -ItemType 'SymbolicLink' -Force"
+    )
+
+    Write-Log " -> Created."
 }
 
 function Get-LatestGitHubAsset ([string]$Owner, [string]$Repo, [string]$AssetName, [string]$TargetDir) {

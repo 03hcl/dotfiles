@@ -9,11 +9,7 @@ function Update-PowerShell {
 
     # Reference:
     #   https://learn.microsoft.com/ja-jp/powershell/scripting/install/installing-powershell-on-windows
-    $pwshPath = "${env:ProgramFiles}\PowerShell\7"
-    if (-not (${env:Path}.Split(';') -contains "${pwshPath}")) {
-        [Environment]::SetEnvironmentVariable("Path", "${pwshPath};${env:Path}", "User")
-    }
-    Import-Path
+    Update-Path "${env:ProgramFiles}\PowerShell\7\"
 
     Write-CommandLog { pwsh --version }
     Write-CommandLog { ${Host} }
@@ -30,10 +26,40 @@ function Update-ExecutionPolicy {
     Write-CommandLog { Get-ExecutionPolicy -List }
 }
 
+# function Enable-DeveloperMode {
+#     $keyName = "SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+#     $valueName = "AllowDevelopmentWithoutDevLicense"
+#     $type = "DWord"
+#     $data = "1"
+
+#     $path = "HKLM:\${keyName}"
+
+#     if (Test-Path "${path}") {
+#         $prop = Get-ItemProperty "${path}"
+#         if (${prop} -and ${prop}."${valueName}" -eq "${data}") { return }
+#     }
+
+#     Start-Process pwsh -Verb "RunAs" -Wait -ArgumentList @(
+#         "-NoProfile",
+#         "-Command",
+#         "Set-ItemProperty -Path '${path}' -Name '${valueName}' -Value '${data}' -Type '${type}'"
+#     )
+# }
+
 function Install-BusyBox {
     Update-WinGetPackage "frippery.busybox-w32"
-    Import-Path
+    New-SymLink -Source `
+        "${env:LOCALAPPDATA}\Microsoft\WinGet\Packages\frippery.busybox-w32_Microsoft.Winget.Source_8wekyb3d8bbwe\busybox.exe"
+
     Write-CommandLog { busybox | busybox head -n 2 }
+}
+
+function Install-Jq {
+    Update-WinGetPackage "jqlang.jq"
+    Import-Path
+    New-SymLink -Source "${env:LOCALAPPDATA}\Microsoft\WinGet\Links\jq.exe"
+
+    Write-CommandLog { jq --version }
 }
 
 function Step9 {
@@ -45,11 +71,16 @@ function Step9 {
 
     . ${PROFILE}.CurrentUserAllHosts
 
+    # Enable-DeveloperMode
+    Update-Path "%USERPROFILE%\.local\bin"
+    Update-Path "%LOCALAPPDATA%\Microsoft\WinGet\Links"
+
     # Write-CommandLog { Get-ChildItem "${env:APPDATA}\Microsoft\Windows\PowerShell\PSReadLine" }
     # Write-CommandLog { Get-PSReadLineOption }
     # Write-CommandLog { Get-PSReadLineKeyHandler }
 
     Install-BusyBox
+    Install-Jq
 }
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
