@@ -20,7 +20,14 @@ function Step9 {
     Remove-AppAlias "python3.exe"
     Import-Path
 
+    New-SymLink -Source (Get-Command python).Source -TargetName "python3.exe"
+    New-SymLink -Source (Get-Command python).Source -TargetName "python3.12.exe"
+
     Write-CommandLog { python --version }
+    Write-CommandLog { python3 --version }
+    Write-CommandLog { python3.12 --version }
+
+    # Write-CommandLog { py --version }
     Write-CommandLog { py -3.12 --version }
 
     Write-CommandLog { pip --version }
