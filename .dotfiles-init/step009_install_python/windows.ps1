@@ -12,8 +12,8 @@ function Remove-AppAlias ([string]$FileName) {
     if (Test-Path "${filePath}") { Remove-Item "${filePath}" }
 }
 
-function Step6 {
-    Write-Step 6 "Install Python 3.12"
+function Step9 {
+    Write-Step 9 "Install Python 3.12"
 
     Update-WinGetPackage "Python.Python.3.12"
     Remove-AppAlias "python.exe"
@@ -37,5 +37,5 @@ function Step6 {
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
     Import-Module -Name "$(Join-Path ("${PSCommandPath}" | Split-Path | Split-Path) "windows_utils.psm1")" -Force
-    Step6 -Args $args
+    Step9 -Args $args
 }

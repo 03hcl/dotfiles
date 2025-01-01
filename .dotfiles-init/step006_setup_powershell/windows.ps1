@@ -66,8 +66,8 @@ function Install-Jq {
     Write-CommandLog { jq --version }
 }
 
-function Step9 {
-    Write-Step 9 "Setup PowerShell"
+function Step6 {
+    Write-Step 6 "Setup PowerShell"
 
     Update-PowerShell
     Update-Profile
@@ -89,5 +89,5 @@ function Step9 {
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
     Import-Module -Name "$(Join-Path ("${PSCommandPath}" | Split-Path | Split-Path) "windows_utils.psm1")" -Force
-    Step9 -Args $args
+    Step6 -Args $args
 }
