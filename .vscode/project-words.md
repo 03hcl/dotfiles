@@ -16,14 +16,27 @@ esktop
 stackdump
 ```
 
+### PowerShell
+
+```plaintext
+HKCU
+HKLM
+```
+
 ### WinGet
 
 ```plaintext
-DesktopAppInstaller_8wekyb3d8bbwe
+8wekyb3d8bbwe
 msixbundle
 Sixel
 Sixels
 WinGet
+```
+
+## Shell tools
+
+```plaintext
+jqlang
 ```
 
 ## Git
