@@ -53,11 +53,25 @@ safecrlf
 venv
 ```
 
+## Rust
+
+```plaintext
+clippy
+rustc
+rustup
+```
+
 ## CLI tools
 
 ```plaintext
 hadolint
 markitdown
+```
+
+## Fonts
+
+```plaintext
+yuru7
 ```
 
 ## VS Code
