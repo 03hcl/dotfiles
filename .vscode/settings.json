@@ -26,6 +26,8 @@
   "cSpell.diagnosticLevel": "Warning",
   "cSpell.enabled": true,
 
+  "files.eol": "\n",
+
   "markdownlint.config": {
     // "MD004": { "style": "consistent" },
     // "MD004": { "style": "sublist" },
