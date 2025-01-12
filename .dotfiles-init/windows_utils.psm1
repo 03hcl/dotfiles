@@ -1,7 +1,8 @@
 Import-Module -Name "$(Join-Path "${PSScriptRoot}" "windows.ps1")" -Force
 
-function Invoke-WithoutProgress ([ScriptBlock]$Script)
-{
+function Get-TempDir { return Join-Path "${env:TEMP}" ".dotfiles-init" }
+
+function Invoke-WithoutProgress ([ScriptBlock]$Script) {
     $pref = "${ProgressPreference}"
     $ProgressPreference = "SilentlyContinue"
 
@@ -27,9 +28,27 @@ function Copy-Resource ([string]$Source, [string]$Target, [string]$TargetDir, [s
         New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
     }
     Copy-Item -Path "${sourcePath}" -Destination "${Target}" -Force
-    # Copy-Item -Path origin.txt -Destination copied.txt
 
     Write-Log " -> Copied."
+}
+
+function Get-OnlineResource ([string]$Source, [string]$Target, [string]$TargetDir, [string]$TargetName = "${Source}") {
+    if ("${Target}") {
+        $TargetDir = "$(Split-Path "${Target}")"
+        $TargetName = "$(Split-Path "${Target}" -Leaf)"
+    }
+    else { $Target = "$(Join-Path "${TargetDir}" "${TargetName}")" }
+
+    Write-Log "Download '${Source}' ..."
+    Write-Log "    from:   ${Source}"
+    Write-Log "    to:     ${Target}"
+
+    if ("${TargetDir}" -and (-not (Test-Path "${TargetDir}"))) {
+        New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
+    }
+    Invoke-WebRequest -Uri "${Source}" -OutFile "${Target}"
+
+    Write-Log " -> Downloaded."
 }
 
 function Update-Path ([string]$append) {
@@ -96,11 +115,12 @@ function New-WinGetPackageLink {
 }
 
 function Get-LatestGitHubAsset ([string]$Owner, [string]$Repo, [string]$AssetName, [string]$TargetDir) {
-    if (-not "${TargetDir}") { $TargetDir = "${env:TEMP}" }
+    if (-not "${TargetDir}") { $TargetDir = "$(Get-TempDir)\${Repo}" }
 
-    Write-Log "Fetch latest tag of ${Owner}/${Repo} ..."
+    Write-Log "Fetch latest tag of '${Owner}/${Repo}' ..."
 
-    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/${Owner}/${Repo}/releases/latest" -UseBasicParsing
+    $apiUri = "https://api.github.com/repos/${Owner}/${Repo}/releases/latest"
+    $release = Invoke-RestMethod -Uri "${apiUri}" -UseBasicParsing
 
     Write-Log
     Write-Log " -> Tag: $(${release}.tag_name)"

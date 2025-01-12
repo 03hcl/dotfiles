@@ -58,6 +58,42 @@ function Install-BusyBox {
     Write-CommandLog { busybox | busybox head -n 2 }
 }
 
+function Install-Cygwin {
+    Update-WinGetPackage "Cygwin.Cygwin"
+
+    $root = "C:\cygwin64"
+    $paths = (
+        "${root}\bin",
+        "${root}\sbin",
+        "${root}\usr\bin",
+        "${root}\usr\sbin",
+        "${root}\usr\local\bin"
+    )
+    foreach ($p in ${paths}) { Update-Path "${p}" }
+    Import-Path
+
+    Write-CommandLog { cygcheck -c cygwin }
+}
+
+function Install-CygwinPackages {
+    # $packages = @(
+    #     "curl",
+    #     "git",
+    #     "jq",
+    #     "openssh",
+    #     "rsync",
+    #     "tar",
+    #     "unzip",
+    #     "wget",
+    #     "zip"
+    # )
+    $src = "https://cygwin.com/setup-x86_64.exe"
+    $dir = "$(Get-TempDir)\cygwin\setup-x86_64.exe"
+
+    New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
+    Invoke-WebRequest -Uri "${src}" -OutFile "${dir}"
+}
+
 function Install-Jq {
     Update-WinGetPackage "jqlang.jq"
     # New-SymLink -Source "${env:LOCALAPPDATA}\Microsoft\WinGet\Links\jq.exe"
@@ -85,6 +121,8 @@ function Step6 {
     # Write-CommandLog { Get-PSReadLineKeyHandler }
 
     Install-BusyBox
+    Install-Cygwin
+    # Install-CygwinPackages
     Install-Jq
 }
 
