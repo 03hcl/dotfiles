@@ -52,16 +52,17 @@ function Update-ExecutionPolicy {
 
 function Install-BusyBox {
     Update-WinGetPackage "frippery.busybox-w32"
-    New-SymLink -Source `
-        "${env:LOCALAPPDATA}\Microsoft\WinGet\Packages\frippery.busybox-w32_Microsoft.Winget.Source_8wekyb3d8bbwe\busybox.exe"
+    New-WinGetPackageLink -Id "frippery.busybox-w32" -Command "busybox"
+    Import-Path
 
     Write-CommandLog { busybox | busybox head -n 2 }
 }
 
 function Install-Jq {
     Update-WinGetPackage "jqlang.jq"
+    # New-SymLink -Source "${env:LOCALAPPDATA}\Microsoft\WinGet\Links\jq.exe"
+    New-WinGetPackageLink -Id "jqlang.jq" -Command "jq"
     Import-Path
-    New-SymLink -Source "${env:LOCALAPPDATA}\Microsoft\WinGet\Links\jq.exe"
 
     Write-CommandLog { jq --version }
 }
@@ -76,8 +77,8 @@ function Step6 {
     . ${PROFILE}.CurrentUserAllHosts
 
     # Enable-DeveloperMode
-    Update-Path "%USERPROFILE%\.local\bin"
     Update-Path "%LOCALAPPDATA%\Microsoft\WinGet\Links"
+    Update-Path "%USERPROFILE%\.local\bin"
 
     # Write-CommandLog { Get-ChildItem "${env:APPDATA}\Microsoft\Windows\PowerShell\PSReadLine" }
     # Write-CommandLog { Get-PSReadLineOption }

@@ -23,8 +23,11 @@ function Copy-Resource ([string]$Source, [string]$Target, [string]$TargetDir, [s
     Write-Log "    from:   ${sourcePath}"
     Write-Log "    to:     ${Target}"
 
-    New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
+    if ("${TargetDir}" -and (-not (Test-Path "${TargetDir}"))) {
+        New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
+    }
     Copy-Item -Path "${sourcePath}" -Destination "${Target}" -Force
+    # Copy-Item -Path origin.txt -Destination copied.txt
 
     Write-Log " -> Copied."
 }
@@ -79,6 +82,17 @@ function New-SymLink {
     )
 
     Write-Log " -> Created."
+}
+
+function New-WinGetPackageLink {
+    param (
+        [string]$Id,
+        [string]$Command,
+        [string]$WinGetSource = "Microsoft.Winget.Source",
+        [string]$PublisherId = "8wekyb3d8bbwe"
+    )
+    $sourceDir = "${env:LOCALAPPDATA}\Microsoft\WinGet\Packages\${Id}_${WinGetSource}_${PublisherId}"
+    New-SymLink -Source "${sourceDir}\${Command}.exe"
 }
 
 function Get-LatestGitHubAsset ([string]$Owner, [string]$Repo, [string]$AssetName, [string]$TargetDir) {

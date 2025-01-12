@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 
 function Set-PSReadLineOptions {
-    Import-Module PSReadLine
+    if (-not (Get-Module -Name PSReadLine)) { Import-Module PSReadLine }
 
     # Reference:
     #   https://learn.microsoft.com/ja-jp/powershell/module/psreadline/set-psreadlineoption
