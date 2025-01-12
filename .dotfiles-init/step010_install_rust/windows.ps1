@@ -4,19 +4,19 @@ Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-
-function Step10 {
-    Write-Step 10 "Install Rust"
-
+function Install-Rust {
     $uri = "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe"
     $file = "${env:TEMP}\rustup-init.exe"
 
     Invoke-WebRequest -Uri "${uri}" -OutFile "${file}"
-    & "${file}" -y
+    $target = "x86_64-pc-windows-gnu"
+    & "${file}" -y --default-host "${target}"  # --default-toolchain "stable-${target}"
     Update-Path "%USERPROFILE%\.cargo\bin"
 
     Write-CommandLog { rustup --version }
+}
 
+function Update-Rust {
     rustup update
 
     Write-CommandLog { rustup --version }
@@ -25,10 +25,22 @@ function Step10 {
     Write-CommandLog { cargo fmt --version }
     # Write-CommandLog { rustfmt --version }
     Write-CommandLog { cargo clippy --version }
+}
 
+# function Install-VSBuildTools {
+#     $uri = "https://aka.ms/vs/17/release/vs_BuildTools.exe"
+#     $file = "${env:TEMP}\vs_BuildTools.exe"
+
+#     Invoke-WebRequest -Uri "${uri}" -OutFile "${file}"
+#     Start-Process -NoNewWindow -Wait -FilePath "${file}"
+# }
+
+function Install-RustOfficialTools {
     rustup component add rust-analyzer
     Write-CommandLog { rust-analyzer --version }
+}
 
+function Install-RustUnofficialTools {
     # cargo install --force ...
     # 候補:
     #   cargo-edit
@@ -64,6 +76,16 @@ function Step10 {
     #   https://github.com/kbknapp/cargo-outdated
     cargo install --force cargo-outdated
     Write-CommandLog { cargo outdated --version }
+}
+
+function Step10 {
+    Write-Step 10 "Install Rust"
+
+    Install-Rust
+    Update-Rust
+
+    Install-RustOfficialTools
+    Install-RustUnofficialTools
 }
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
