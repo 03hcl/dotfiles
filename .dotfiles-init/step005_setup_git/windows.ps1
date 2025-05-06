@@ -58,10 +58,6 @@ function Update-GitConfig {
 
 # Reference: https://git-scm.com/docs/gitattributes
 function Update-GitAttributes {
-    Write-Log
-    Write-Log ("-" * 72)
-    Write-Log
-
     $attrs = @(Get-GitVariables GIT_ATTR_GLOBAL)
     Remove-GitPaths -Paths $attrs
 
@@ -71,10 +67,6 @@ function Update-GitAttributes {
 
 # Reference: https://git-scm.com/docs/gitignore
 function Update-GitIgnore {
-    Write-Log
-    Write-Log ("-" * 72)
-    Write-Log
-
     # Remove-GitPaths -Paths @("${env:USERPROFILE}\.config\git\ignore")
 
     # Write-Log
@@ -85,7 +77,17 @@ function Step5 {
     Write-Step 5 "Setup Git"
 
     Update-GitConfig
+
+    Write-Log
+    Write-Log ("-" * 72)
+    Write-Log
+
     Update-GitAttributes
+
+    Write-Log
+    Write-Log ("-" * 72)
+    Write-Log
+
     Update-GitIgnore
 }
 
