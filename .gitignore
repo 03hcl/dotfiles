@@ -21,6 +21,8 @@
 !/.dotfiles-init
 /.dotfiles-init/*
 !/.dotfiles-init/README.md
+!/.dotfiles-init/linux.sh
+!/.dotfiles-init/linux_utils.sh
 !/.dotfiles-init/windows.ps1
 !/.dotfiles-init/windows_utils.psm1
 !/.dotfiles-init/step005_setup_git
