@@ -18,6 +18,8 @@ function Set-PSReadLineOptions {
     #   https://learn.microsoft.com/ja-jp/powershell/scripting/learn/shell/using-keyhandlers
     Set-PSReadLineKeyHandler -Key Ctrl+d -Function DeleteCharOrExit
     Set-PSReadLineKeyHandler -Key Ctrl+v -Function Paste
+    Set-PSReadLineKeyHandler -Key Ctrl+LeftArrow -Function BackwardWord
+    Set-PSReadLineKeyHandler -Key Ctrl+RightArrow -Function ForwardWord
 }
 
 chcp 65001
