@@ -11,44 +11,93 @@ function Invoke-WithoutProgress ([ScriptBlock]$Script) {
     $ProgressPreference = "${pref}"
 }
 
+function Initialize-ResourceDir ([string]$Source, [string]$Target, [string]$TargetDir, [string]$TargetName) {
+    if ("${Target}") {
+        $TargetDir = "$(Split-Path "${Target}")"
+        $TargetName = "$(Split-Path "${Target}" -Leaf)"
+    }
+    else { $Target = "$(Join-Path "${TargetDir}" "${TargetName}")" }
+
+    Write-Log "    from:   '${Source}'"
+    Write-Log "    to:     '${Target}'"
+
+    if ("${TargetDir}" -and (-not (Test-Path "${TargetDir}"))) {
+        New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
+    }
+
+    return "${Target}"
+}
+
 function Copy-Resource ([string]$Source, [string]$Target, [string]$TargetDir, [string]$TargetName = "${Source}") {
     $sourcePath = "$(Join-Path (Split-Path "$((Get-PSCallStack)[1].ScriptName)") "${Source}")"
 
-    if ("${Target}") {
-        $TargetDir = "$(Split-Path "${Target}")"
-        $TargetName = "$(Split-Path "${Target}" -Leaf)"
-    }
-    else { $Target = "$(Join-Path "${TargetDir}" "${TargetName}")" }
-
     Write-Log "Copy '${Source}' ..."
-    Write-Log "    from:   ${sourcePath}"
-    Write-Log "    to:     ${Target}"
 
-    if ("${TargetDir}" -and (-not (Test-Path "${TargetDir}"))) {
-        New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
-    }
-    Copy-Item -Path "${sourcePath}" -Destination "${Target}" -Force
+    $dst = Initialize-ResourceDir "${sourcePath}" "${Target}" "${TargetDir}" "${TargetName}"
+
+    try { Copy-Item -LiteralPath "${sourcePath}" -Destination "${dst}" -Force -ErrorAction Stop }
+    catch { [System.IO.File]::WriteAllBytes("${dst}", [System.IO.File]::ReadAllBytes("${sourcePath}")) }
 
     Write-Log " -> Copied."
+    return "${dst}"
 }
 
-function Get-OnlineResource ([string]$Source, [string]$Target, [string]$TargetDir, [string]$TargetName = "${Source}") {
-    if ("${Target}") {
-        $TargetDir = "$(Split-Path "${Target}")"
-        $TargetName = "$(Split-Path "${Target}" -Leaf)"
-    }
-    else { $Target = "$(Join-Path "${TargetDir}" "${TargetName}")" }
+function Get-LockingProcesses ([string]$Path) {
+    $name = [System.IO.Path]::GetFileName("${Path}")
+    return Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and ($_.CommandLine -like "*${name}*") }
+}
+
+function Get-OnlineResource {
+    param (
+        [string]$Source,
+        [string]$Target,
+        [string]$TargetDir = "$(Get-TempDir)",
+        [string]$TargetName = "$(Split-Path "${Source}" -Leaf)"
+    )
 
     Write-Log "Download '${Source}' ..."
-    Write-Log "    from:   ${Source}"
-    Write-Log "    to:     ${Target}"
 
-    if ("${TargetDir}" -and (-not (Test-Path "${TargetDir}"))) {
-        New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
-    }
-    Invoke-WebRequest -Uri "${Source}" -OutFile "${Target}"
+    $dst = Initialize-ResourceDir "${Source}" "${Target}" "${TargetDir}" "${TargetName}"
+    Invoke-WithoutProgress { Invoke-WebRequest -Uri "${Source}" -OutFile "${dst}" }
 
     Write-Log " -> Downloaded."
+    return "${dst}"
+}
+
+function Invoke-ProcessCapture {
+    param(
+        [Parameter(Mandatory=$true, Position=0)]
+        [string]$FilePath,
+
+        [Parameter(Position=1, ValueFromRemainingArguments=$true)]
+        [string[]]$ArgumentList
+    )
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+
+    ${psi}.FileName = ${FilePath}
+    ${psi}.Arguments = (${ArgumentList} | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }) -join ' '
+
+    ${psi}.CreateNoWindow = $true
+    ${psi}.RedirectStandardError = $true
+    ${psi}.RedirectStandardOutput = $true
+    ${psi}.StandardErrorEncoding = [System.Text.Encoding]::UTF8
+    ${psi}.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+    ${psi}.UseShellExecute = $false
+
+    $proc = New-Object System.Diagnostics.Process
+    ${proc}.StartInfo = ${psi}
+
+    ${proc}.Start() > $null
+    $outText = ${proc}.StandardOutput.ReadToEnd()
+    $errText = ${proc}.StandardError.ReadToEnd()
+    ${proc}.WaitForExit()
+
+    return [PSCustomObject]@{
+        Out = "${outText}" -split "`r?`n";
+        Err = "${errText}" -split "`r?`n";
+        ExitCode = ${proc}.ExitCode;
+    }
 }
 
 function Update-Path ([string]$append) {
@@ -61,6 +110,16 @@ function Update-Path ([string]$append) {
     Import-Path
 }
 
+function Update-EnvPath ([string]$key, [string]$value) {
+    $current = (Get-ItemProperty "HKCU:\Environment")."${key}"
+    foreach ($c in ${current}.Split(';')) {
+        $expanded = [System.Environment]::ExpandEnvironmentVariables("${c}")
+        if ("${expanded}" -eq "${value}") { return }
+    }
+
+    [System.Environment]::SetEnvironmentVariable("${key}", "${value};${current}", "User")
+}
+
 function New-SymLink {
     param (
         [string]$Source,
@@ -69,18 +128,12 @@ function New-SymLink {
         [string]$TargetName = "$(Split-Path "${Source}" -Leaf)"
     )
 
-    if ("${Target}") {
-        $TargetDir = "$(Split-Path "${Target}")"
-        $TargetName = "$(Split-Path "${Target}" -Leaf)"
-    }
-    else { $Target = "$(Join-Path "${TargetDir}" "${TargetName}")" }
-
     Write-Log "Create a symbolic link of '$(Split-Path "${Source}" -Leaf)' ..."
-    Write-Log "    from:   ${Source}"
-    Write-Log "    to:     ${Target}"
 
-    if (Test-Path "${Target}") {
-        $prop = Get-ItemProperty "${Target}"
+    $dst = Initialize-ResourceDir "${Source}" "${Target}" "${TargetDir}" "${TargetName}"
+
+    if (Test-Path "${dst}") {
+        $prop = Get-ItemProperty "${dst}"
 
         # NOTE: `.LinkTarget` is probably not supported in PowerShell < 7.1
         # if (${prop} -and (${prop}.LinkTarget -eq "${Source}")) {
@@ -90,17 +143,16 @@ function New-SymLink {
         }
     }
 
-    New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
-
     # NOTE: Not working on PowerShell 5.1 even with developer mode
-    # New-Item -Path "${Target}" -Value "${Source}" -ItemType "SymbolicLink" -Force
-    Start-Process pwsh -Verb "RunAs" -Wait -ArgumentList @(
+    # New-Item -Path "${dst}" -Value "${Source}" -ItemType "SymbolicLink" -Force
+    Start-Process -FilePath "pwsh.exe" -Verb "RunAs" -Wait -ArgumentList @(
         "-NoProfile",
         "-Command",
-        "New-Item -Path '${Target}' -Value '${Source}' -ItemType 'SymbolicLink' -Force"
+        "New-Item -Path '${dst}' -Value '${Source}' -ItemType 'SymbolicLink' -Force"
     )
 
     Write-Log " -> Created."
+    return "${dst}"
 }
 
 function New-WinGetPackageLink {
@@ -123,8 +175,8 @@ function Get-LatestGitHubAsset ([string]$Owner, [string]$Repo, [string]$AssetNam
     $release = Invoke-RestMethod -Uri "${apiUri}" -UseBasicParsing
 
     Write-Log
-    Write-Log " -> Tag: $(${release}.tag_name)"
-    Write-Log "    URL: $(${release}.html_url)"
+    Write-Log " -> Tag: '$(${release}.tag_name)'"
+    Write-Log "    URL: '$(${release}.html_url)'"
     Write-Log
 
     $asset = ${release}.assets | Where-Object { $_.name -eq "${AssetName}" }
@@ -133,8 +185,8 @@ function Get-LatestGitHubAsset ([string]$Owner, [string]$Repo, [string]$AssetNam
 
     Write-Log "Download an asset ..."
     Write-Log
-    Write-Log "    from:   ${source}"
-    Write-Log "    to:     ${target}"
+    Write-Log "    from:   '${source}'"
+    Write-Log "    to:     '${target}'"
 
     Invoke-WithoutProgress { Invoke-WebRequest -Uri "${source}" -OutFile "${target}" }
 

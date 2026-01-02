@@ -42,9 +42,11 @@ jqlang
 ## Git
 
 ```plaintext
+defaultbranch
 excludesfile
 rerere
 safecrlf
+sslcainfo
 ```
 
 ## Python
