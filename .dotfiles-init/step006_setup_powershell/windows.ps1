@@ -70,28 +70,62 @@ function Install-Cygwin {
         "${root}\usr\local\bin"
     )
     foreach ($p in ${paths}) { Update-Path "${p}" }
+    # $libs = (
+    #     "${root}\lib",
+    #     "${root}\lib\w32api",
+    #     "${root}\usr\lib",
+    #     "${root}\usr\local\lib"
+    # )
+    # foreach ($l in ${libs}) { Update-EnvPath "LD_LIBRARY_PATH" "${l}" }
+
     Import-Path
 
     Write-CommandLog { cygcheck -c cygwin }
 }
 
 function Install-CygwinPackages {
-    # $packages = @(
-    #     "curl",
-    #     "git",
-    #     "jq",
-    #     "openssh",
-    #     "rsync",
-    #     "tar",
-    #     "unzip",
-    #     "wget",
-    #     "zip"
-    # )
+    $packages = @(
+        # "automake",
+        "bash-completion",
+        "build-essential",
+        "ca-certificates",
+        "cmake",
+        "curl",
+        "dnsutils",
+        "gawk",
+        "gcc-core",
+        # "gcc-fortran",
+        "gcc-g++",
+        "gdb",
+        "htop",
+        "iputils-ping",
+        "less",
+        # "libboost-devel",
+        "make",
+        "openssh",
+        "openssl",
+        # "patch",
+        "perl",
+        "rsync",
+        "tar",
+        "tree",
+        "unzip",
+        "vim",
+        "wget",
+        "xxd",
+        "zip"
+    )
     $src = "https://cygwin.com/setup-x86_64.exe"
-    $dir = "$(Get-TempDir)\cygwin\setup-x86_64.exe"
+    $script = Get-OnlineResource -Source "${src}" -TargetDir "$(Get-TempDir)\cygwin"
 
-    New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
-    Invoke-WebRequest -Uri "${src}" -OutFile "${dir}"
+    Start-Process -FilePath "${script}" -Wait -ArgumentList @(
+        "--quiet-mode",
+        "--upgrade-also",
+        "--packages",
+        "$(${packages} -join ',')"
+    )
+
+    Write-CommandLog { cygcheck -c }
 }
 
 function Install-Jq {
@@ -121,7 +155,7 @@ function Step6 {
     # Write-CommandLog { Get-PSReadLineKeyHandler }
 
     Install-BusyBox
-    Install-Cygwin
+    # Install-Cygwin
     # Install-CygwinPackages
     Install-Jq
 }
