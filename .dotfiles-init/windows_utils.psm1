@@ -1,33 +1,5 @@
 Import-Module -Name "$(Join-Path "${PSScriptRoot}" "windows.ps1")" -Force
 
-function Get-TempDir { return Join-Path "${env:TEMP}" ".dotfiles-init" }
-
-function Invoke-WithoutProgress ([ScriptBlock]$Script) {
-    $pref = "${ProgressPreference}"
-    $ProgressPreference = "SilentlyContinue"
-
-    & ${Script}
-
-    $ProgressPreference = "${pref}"
-}
-
-function Initialize-ResourceDir ([string]$Source, [string]$Target, [string]$TargetDir, [string]$TargetName) {
-    if ("${Target}") {
-        $TargetDir = "$(Split-Path "${Target}")"
-        $TargetName = "$(Split-Path "${Target}" -Leaf)"
-    }
-    else { $Target = "$(Join-Path "${TargetDir}" "${TargetName}")" }
-
-    Write-Log "    from:   '${Source}'"
-    Write-Log "    to:     '${Target}'"
-
-    if ("${TargetDir}" -and (-not (Test-Path "${TargetDir}"))) {
-        New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
-    }
-
-    return "${Target}"
-}
-
 function Copy-Resource ([string]$Source, [string]$Target, [string]$TargetDir, [string]$TargetName = "${Source}") {
     $sourcePath = "$(Join-Path (Split-Path "$((Get-PSCallStack)[1].ScriptName)") "${Source}")"
 
@@ -40,6 +12,35 @@ function Copy-Resource ([string]$Source, [string]$Target, [string]$TargetDir, [s
 
     Write-Log " -> Copied."
     return "${dst}"
+}
+
+function Get-LatestGitHubAsset ([string]$Owner, [string]$Repo, [string]$AssetName, [string]$TargetDir) {
+    if (-not "${TargetDir}") { $TargetDir = "$(Get-TempDir)\${Repo}" }
+
+    Write-Log "Fetch latest tag of '${Owner}/${Repo}' ..."
+
+    $apiUri = "https://api.github.com/repos/${Owner}/${Repo}/releases/latest"
+    $release = Invoke-RestMethod -Uri "${apiUri}" -UseBasicParsing
+
+    Write-Log
+    Write-Log " -> Tag: '$(${release}.tag_name)'"
+    Write-Log "    URL: '$(${release}.html_url)'"
+    Write-Log
+
+    $asset = ${release}.assets | Where-Object { $_.name -eq "${AssetName}" }
+    $source = ${asset}.browser_download_url
+    $target = "${TargetDir}/${AssetName}"
+
+    Write-Log "Download an asset ..."
+    Write-Log
+    Write-Log "    from:   '${source}'"
+    Write-Log "    to:     '${target}'"
+
+    Invoke-WithoutProgress { Invoke-WebRequest -Uri "${source}" -OutFile "${target}" }
+
+    Write-Log
+    Write-Log " -> Downloaded."
+    return "${target}"
 }
 
 function Get-LockingProcesses ([string]$Path) {
@@ -62,6 +63,25 @@ function Get-OnlineResource {
 
     Write-Log " -> Downloaded."
     return "${dst}"
+}
+
+function Get-TempDir { return Join-Path "${env:TEMP}" ".dotfiles-init" }
+
+function Initialize-ResourceDir ([string]$Source, [string]$Target, [string]$TargetDir, [string]$TargetName) {
+    if ("${Target}") {
+        $TargetDir = "$(Split-Path "${Target}")"
+        $TargetName = "$(Split-Path "${Target}" -Leaf)"
+    }
+    else { $Target = "$(Join-Path "${TargetDir}" "${TargetName}")" }
+
+    Write-Log "    from:   '${Source}'"
+    Write-Log "    to:     '${Target}'"
+
+    if ("${TargetDir}" -and (-not (Test-Path "${TargetDir}"))) {
+        New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
+    }
+
+    return "${Target}"
 }
 
 function Invoke-ProcessCapture {
@@ -100,24 +120,13 @@ function Invoke-ProcessCapture {
     }
 }
 
-function Update-Path ([string]$append) {
-    $expanded = [System.Environment]::ExpandEnvironmentVariables("${append}")
-    if ("${expanded}" -in "${env:Path}".Split(';')) { return }
+function Invoke-WithoutProgress ([ScriptBlock]$Script) {
+    $pref = "${ProgressPreference}"
+    $ProgressPreference = "SilentlyContinue"
 
-    $current = (Get-ItemProperty "HKCU:\Environment").Path
-    [System.Environment]::SetEnvironmentVariable("Path", "${append};${current}", "User")
+    & ${Script}
 
-    Import-Path
-}
-
-function Update-EnvPath ([string]$key, [string]$value) {
-    $current = (Get-ItemProperty "HKCU:\Environment")."${key}"
-    foreach ($c in ${current}.Split(';')) {
-        $expanded = [System.Environment]::ExpandEnvironmentVariables("${c}")
-        if ("${expanded}" -eq "${value}") { return }
-    }
-
-    [System.Environment]::SetEnvironmentVariable("${key}", "${value};${current}", "User")
+    $ProgressPreference = "${pref}"
 }
 
 function New-SymLink {
@@ -166,31 +175,22 @@ function New-WinGetPackageLink {
     New-SymLink -Source "${sourceDir}\${Command}.exe"
 }
 
-function Get-LatestGitHubAsset ([string]$Owner, [string]$Repo, [string]$AssetName, [string]$TargetDir) {
-    if (-not "${TargetDir}") { $TargetDir = "$(Get-TempDir)\${Repo}" }
+function Update-EnvPath ([string]$key, [string]$value) {
+    $current = (Get-ItemProperty "HKCU:\Environment")."${key}"
+    foreach ($c in ${current}.Split(';')) {
+        $expanded = [System.Environment]::ExpandEnvironmentVariables("${c}")
+        if ("${expanded}" -eq "${value}") { return }
+    }
 
-    Write-Log "Fetch latest tag of '${Owner}/${Repo}' ..."
+    [System.Environment]::SetEnvironmentVariable("${key}", "${value};${current}", "User")
+}
 
-    $apiUri = "https://api.github.com/repos/${Owner}/${Repo}/releases/latest"
-    $release = Invoke-RestMethod -Uri "${apiUri}" -UseBasicParsing
+function Update-Path ([string]$append) {
+    $expanded = [System.Environment]::ExpandEnvironmentVariables("${append}")
+    if ("${expanded}" -in "${env:Path}".Split(';')) { return }
 
-    Write-Log
-    Write-Log " -> Tag: '$(${release}.tag_name)'"
-    Write-Log "    URL: '$(${release}.html_url)'"
-    Write-Log
+    $current = (Get-ItemProperty "HKCU:\Environment").Path
+    [System.Environment]::SetEnvironmentVariable("Path", "${append};${current}", "User")
 
-    $asset = ${release}.assets | Where-Object { $_.name -eq "${AssetName}" }
-    $source = ${asset}.browser_download_url
-    $target = "${TargetDir}/${AssetName}"
-
-    Write-Log "Download an asset ..."
-    Write-Log
-    Write-Log "    from:   '${source}'"
-    Write-Log "    to:     '${target}'"
-
-    Invoke-WithoutProgress { Invoke-WebRequest -Uri "${source}" -OutFile "${target}" }
-
-    Write-Log
-    Write-Log " -> Downloaded."
-    return "${target}"
+    Import-Path
 }
