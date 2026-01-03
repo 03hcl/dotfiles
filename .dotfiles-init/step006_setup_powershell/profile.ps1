@@ -73,8 +73,8 @@ function Invoke-LinuxLikeSSHCopyId {
         [Alias("V")]
         [switch]$Version
     )
-    $args = @(${PSBoundParameters}.Values | ForEach-Object { $_.ToString() })
-    if (${Help} -or (${args} | Where-Object { ${__profileHelpFlags} -contains $_ })) {
+    $params = @(${PSBoundParameters}.Values | ForEach-Object { $_.ToString() })
+    if (${Help} -or (${params} | Where-Object { ${__profileHelpFlags} -contains $_ })) {
         ""
         "[POWERED BY 'profiles.ps1' (CREATED BY 03hcl/dotfiles)]"
         ""
@@ -98,7 +98,7 @@ function Invoke-LinuxLikeSSHCopyId {
         ""
         return
     }
-    if (${Version} -or (${args} | Where-Object { ${__profileVersionFlags} -contains $_ })) { "${__profileVersion}"; return }
+    if (${Version} -or (${params} | Where-Object { ${__profileVersionFlags} -contains $_ })) { "${__profileVersion}"; return }
 
     $content = (Get-Content -Path "${IdentityFilePath}" -ErrorAction Stop) -replace "`r?`n", ""
     $command = "mkdir -p ~/.ssh && chmod 700 ~/.ssh && printf '%s\n' '${content}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
@@ -144,8 +144,8 @@ function Lock-File {
         [Alias("V")]
         [switch]$Version
     )
-    $args = @(${PSBoundParameters}.Values | ForEach-Object { $_.ToString() })
-    if (${Help} -or (${args} | Where-Object { ${__profileHelpFlags} -contains $_ })) {
+    $params = @(${PSBoundParameters}.Values | ForEach-Object { $_.ToString() })
+    if (${Help} -or (${params} | Where-Object { ${__profileHelpFlags} -contains $_ })) {
         ""
         "[POWERED BY 'profiles.ps1' (CREATED BY 03hcl/dotfiles)]"
         ""
@@ -172,7 +172,7 @@ function Lock-File {
         ""
         return
     }
-    if (${Version} -or (${args} | Where-Object { ${__profileVersionFlags} -contains $_ })) { "${__profileVersion}"; return }
+    if (${Version} -or (${params} | Where-Object { ${__profileVersionFlags} -contains $_ })) { "${__profileVersion}"; return }
 
     # if (${Timeout} -eq 0) { $NonBlock = $true }
 
