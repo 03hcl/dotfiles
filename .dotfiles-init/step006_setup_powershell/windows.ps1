@@ -1,5 +1,8 @@
 #!/usr/bin/env pwsh
 
+[CmdletBinding(SupportsShouldProcess = $true)]
+param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Args)
+
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -30,25 +33,25 @@ function Update-ExecutionPolicy {
     Write-CommandLog { Get-ExecutionPolicy -List }
 }
 
-# function Enable-DeveloperMode {
-#     $keyName = "SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
-#     $valueName = "AllowDevelopmentWithoutDevLicense"
-#     $type = "DWord"
-#     $data = "1"
+function Enable-DeveloperMode {
+    $key = "SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+    $value = "AllowDevelopmentWithoutDevLicense"
+    $type = "DWord"
+    $data = "1"
 
-#     $path = "HKLM:\${keyName}"
+    $path = "HKLM:\${key}"
 
-#     if (Test-Path "${path}") {
-#         $prop = Get-ItemProperty "${path}"
-#         if (${prop} -and ${prop}."${valueName}" -eq "${data}") { return }
-#     }
+    if (Test-Path "${path}") {
+        $prop = Get-ItemProperty "${path}"
+        if (${prop} -and ${prop}."${value}" -eq "${data}") { return }
+    }
 
-#     Start-Process pwsh -Verb "RunAs" -Wait -ArgumentList @(
-#         "-NoProfile",
-#         "-Command",
-#         "Set-ItemProperty -Path '${path}' -Name '${valueName}' -Value '${data}' -Type '${type}'"
-#     )
-# }
+    Start-Process pwsh -Verb "RunAs" -Wait -ArgumentList @(
+        "-NoProfile",
+        "-Command",
+        "Set-ItemProperty -Path '${path}' -Name '${value}' -Value '${data}' -PropertyType '${type}' -Force"
+    )
+}
 
 function Install-BusyBox {
     Update-WinGetPackage "frippery.busybox-w32"
@@ -70,15 +73,13 @@ function Install-Cygwin {
         "${root}\usr\local\bin"
     )
     foreach ($p in ${paths}) { Update-Path "${p}" }
-    # $libs = (
-    #     "${root}\lib",
-    #     "${root}\lib\w32api",
-    #     "${root}\usr\lib",
-    #     "${root}\usr\local\lib"
-    # )
-    # foreach ($l in ${libs}) { Update-EnvPath "LD_LIBRARY_PATH" "${l}" }
-
-    Import-Path
+    $libs = (
+        "${root}\lib",
+        "${root}\lib\w32api",
+        "${root}\usr\lib",
+        "${root}\usr\local\lib"
+    )
+    Update-Path -ForceFirst -Key "LD_LIBRARY_PATH" @(${libs})
 
     Write-CommandLog { cygcheck -c cygwin }
 }
@@ -138,6 +139,9 @@ function Install-Jq {
 }
 
 function Step6 {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Args)
+
     Write-Step 6 "Setup PowerShell"
 
     Update-PowerShell
@@ -147,12 +151,15 @@ function Step6 {
     . ${PROFILE}.CurrentUserAllHosts
 
     # Enable-DeveloperMode
-    Update-Path "%LOCALAPPDATA%\Microsoft\WinGet\Links"
-    Update-Path "%USERPROFILE%\.local\bin"
 
-    # Write-CommandLog { Get-ChildItem "${env:APPDATA}\Microsoft\Windows\PowerShell\PSReadLine" }
-    # Write-CommandLog { Get-PSReadLineOption }
-    # Write-CommandLog { Get-PSReadLineKeyHandler }
+    $commonParams = Get-CommonParameters $PSBoundParameters
+    Update-Path @commonParams -ForceFirst `
+        "%USERPROFILE%\.local\bin" `
+        "%LOCALAPPDATA%\Microsoft\WinGet\Links"
+
+    Write-CommandLog { Get-ChildItem "${env:APPDATA}\Microsoft\Windows\PowerShell\PSReadLine" }
+    Write-CommandLog { Get-PSReadLineOption }
+    Write-CommandLog { Get-PSReadLineKeyHandler }
 
     Install-BusyBox
     # Install-Cygwin
@@ -162,5 +169,5 @@ function Step6 {
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
     Import-Module -Name "$(Join-Path ("${PSCommandPath}" | Split-Path | Split-Path) "windows_utils.psm1")" -Force
-    Step6 -Args $args
+    Step6 @PSBoundParameters -Args ${Args}
 }

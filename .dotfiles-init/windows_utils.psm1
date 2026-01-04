@@ -14,6 +14,8 @@ function Copy-Resource ([string]$Source, [string]$Target, [string]$TargetDir, [s
     return "${dst}"
 }
 
+function Expand-Env ([string]$Name) { [System.Environment]::ExpandEnvironmentVariables("${Name}") }
+
 function Get-LatestGitHubAsset ([string]$Owner, [string]$Repo, [string]$AssetName, [string]$TargetDir) {
     if (-not "${TargetDir}") { $TargetDir = "$(Get-TempDir)\${Repo}" }
 
@@ -65,6 +67,46 @@ function Get-OnlineResource {
     return "${dst}"
 }
 
+function Get-CommonParameters {
+    param([Parameter(Mandatory = $true, Position = 0)][hashtable]$Params)
+
+    # Reference:
+    #   https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_commonparameters
+    #   https://learn.microsoft.com/ja-jp/powershell/scripting/learn/deep-dives/everything-about-shouldprocess
+    $allowed = @(
+        "ActionPreference",
+        "Confirm",
+        "Debug",
+        "ErrorAction",
+        "ErrorVariable",
+        "InformationAction",
+        "InformationVariable",
+        "OutBuffer",
+        "OutVariable",
+        "PipelineVariable",
+        "ProcessAction",
+        "Verbose",
+        "WarningAction",
+        "WarningVariable",
+        "WhatIf"
+    )
+
+    return $Params.GetEnumerator() |
+        Where-Object { ${allowed} -contains $_.Key } |
+        ForEach-Object -Begin { $result = @{} } -Process { ${result}[$_.Key] = $_.Value } -End { ${result} }
+}
+
+function Get-RawRegistryValue ([string]$Path, [string]$Name) {
+    $sub = ${Path} -replace "^.+?:[/\\]", ""
+
+    if (${Path} -like "HKLM:*") { $client = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(${sub}) }
+    else { $client = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey(${sub}) }
+
+    if (-not ${client}) { return $null }
+
+    return ${client}.GetValue(${Name}, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+}
+
 function Get-TempDir { return Join-Path "${env:TEMP}" ".dotfiles-init" }
 
 function Initialize-ResourceDir ([string]$Source, [string]$Target, [string]$TargetDir, [string]$TargetName) {
@@ -86,10 +128,10 @@ function Initialize-ResourceDir ([string]$Source, [string]$Target, [string]$Targ
 
 function Invoke-ProcessCapture {
     param(
-        [Parameter(Mandatory=$true, Position=0)]
+        [Parameter(Mandatory = $true, Position = 0)]
         [string]$FilePath,
 
-        [Parameter(Position=1, ValueFromRemainingArguments=$true)]
+        [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
         [string[]]$ArgumentList
     )
 
@@ -114,8 +156,8 @@ function Invoke-ProcessCapture {
     ${proc}.WaitForExit()
 
     return [PSCustomObject]@{
-        Out = "${outText}" -split "`r?`n";
-        Err = "${errText}" -split "`r?`n";
+        Out      = "${outText}" -split "`r?`n";
+        Err      = "${errText}" -split "`r?`n";
         ExitCode = ${proc}.ExitCode;
     }
 }
@@ -175,22 +217,38 @@ function New-WinGetPackageLink {
     New-SymLink -Source "${sourceDir}\${Command}.exe"
 }
 
-function Update-EnvPath ([string]$key, [string]$value) {
-    $current = (Get-ItemProperty "HKCU:\Environment")."${key}"
-    foreach ($c in ${current}.Split(';')) {
-        $expanded = [System.Environment]::ExpandEnvironmentVariables("${c}")
-        if ("${expanded}" -eq "${value}") { return }
+function Update-Path {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param (
+        [switch]$ForceFirst = $false,
+        [string]$Path = "HKCU:\Environment",
+        [string]$Key = "Path",
+
+        [Parameter(Mandatory = $true, Position = 0, ValueFromRemainingArguments = $true)]
+        [string[]]$Values
+    )
+
+    $valid = ${Values} | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    if (${valid}) { [array]::Reverse(${valid}) }
+
+    foreach ($target in ${valid}) {
+        $current = (Get-RawRegistryValue "${Path}" "${Key}") -split ';' |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ }
+        $new = ${current}
+        $expandedTarget = Expand-Env ${target}
+
+        if (${expandedTarget} -in (${current} | ForEach-Object { Expand-Env $_ })) {
+            if (-not ${ForceFirst}) { continue }
+            $new = ${new} | Where-Object { (Expand-Env $_) -ne ${expandedTarget} }
+        }
+
+        $value = (@(${target}) + ${new}) -join ';'
+
+        $message = "Set Key: '${Key}' to Value: '${value}'"
+        if (-not ${PSCmdlet}.ShouldProcess("${Path}", "${message}")) { continue }
+
+        [System.Environment]::SetEnvironmentVariable("${Key}", "${value}", "User")
+        if ("${Key}" -eq "Path") { Import-Path }
     }
-
-    [System.Environment]::SetEnvironmentVariable("${key}", "${value};${current}", "User")
-}
-
-function Update-Path ([string]$append) {
-    $expanded = [System.Environment]::ExpandEnvironmentVariables("${append}")
-    if ("${expanded}" -in "${env:Path}".Split(';')) { return }
-
-    $current = (Get-ItemProperty "HKCU:\Environment").Path
-    [System.Environment]::SetEnvironmentVariable("Path", "${append};${current}", "User")
-
-    Import-Path
 }
