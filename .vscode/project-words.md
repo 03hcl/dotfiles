@@ -13,14 +13,17 @@ chcp
 ehthumbs
 encryptable
 esktop
+HKCU
+HKLM
+MSVC
 stackdump
 ```
 
 ### PowerShell
 
 ```plaintext
-HKCU
-HKLM
+LASTEXITCODE
+PSHOME
 ```
 
 ### WinGet
@@ -36,7 +39,12 @@ WinGet
 ## Shell tools
 
 ```plaintext
+cygcheck
+devel
+dnsutils
 jqlang
+libboost
+nonblock
 ```
 
 ## Git
@@ -58,6 +66,7 @@ venv
 ## Rust
 
 ```plaintext
+benchcmp
 clippy
 rustc
 rustup
@@ -82,4 +91,13 @@ yuru7
 mhutchie.git-graph
 ms-ceintl.vscode-language-pack-ja
 ms-vscode.powershell
+```
+
+### VS Code Settings
+
+```plaintext
+hascodecells
+havenativecells
+PlantUML
+runallcells
 ```
