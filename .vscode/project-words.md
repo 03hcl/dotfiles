@@ -45,6 +45,7 @@ dnsutils
 jqlang
 libboost
 nonblock
+restorecon
 ```
 
 ## Git
@@ -60,6 +61,8 @@ sslcainfo
 ## Python
 
 ```plaintext
+pycache
+pytest
 venv
 ```
 

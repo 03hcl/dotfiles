@@ -1,0 +1,25 @@
+# Tests
+
+<!-- markdownlint-disable MD013 -->
+
+Tests are written in Python with [pytest](https://docs.pytest.org/).
+Each test runs on every PowerShell found (`pwsh` and Windows PowerShell 5.1 `powershell`).
+
+Requirements:
+
+- [uv](https://docs.astral.sh/uv/) (installed by `step009_install_python`)
+- `busybox` (installed by `step006_setup_powershell`) to emulate the remote shell; tests that need it are skipped without it
+
+Run (takes a few minutes):
+
+```powershell
+uvx pytest .dotfiles-init\tests
+```
+
+If uv fails with `did not find executable at '...\.local\bin\python.exe'`, specify the Python:
+
+```powershell
+uvx --python (Get-Command python).Source pytest .dotfiles-init\tests
+```
+
+Add `-v` to list each test, or `-k <keyword>` to select tests (e.g. `-k dry_run`).

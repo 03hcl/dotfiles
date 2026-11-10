@@ -41,14 +41,14 @@ function Update-ProfileAlias {
 ###############################################################################
 
 $__profileHelpFlags = @("-h", "-?", "--help", "/?")
-$__profileVersion = "version 0.1.0 (2026-01-02)"
+$__profileVersion = "version 0.2.0 (2026-11-10)"
 $__profileVersionFlags = @("-V", "--version")
 
 function Invoke-LinuxLikeSSHCopyId {
-    [CmdletBinding()]
+    [CmdletBinding(PositionalBinding = $false)]
     param (
-        # [Alias("f")]
-        # [string]$Force,
+        [Alias("f")]
+        [switch]$Force,
 
         [Alias("n")]
         [switch]$DryRun,
@@ -62,10 +62,11 @@ function Invoke-LinuxLikeSSHCopyId {
         [Alias("i")]
         [string]$IdentityFilePath,
 
+        [Alias("p")]
+        [string]$Port,
+
         [Parameter(ValueFromRemainingArguments = $true)]
         [string[]]$SSHParams,
-
-        [string[]]$Destinations,
 
         [Alias("h", "?")]
         [switch]$Help,
@@ -73,40 +74,69 @@ function Invoke-LinuxLikeSSHCopyId {
         [Alias("V")]
         [switch]$Version
     )
-    $params = @(${PSBoundParameters}.Values | ForEach-Object { $_.ToString() })
-    if (${Help} -or (${params} | Where-Object { ${__profileHelpFlags} -contains $_ })) {
+    if (${Help} -or (${SSHParams} | Where-Object { ${__profileHelpFlags} -contains $_ })) {
         ""
         "[POWERED BY 'profiles.ps1' (CREATED BY 03hcl/dotfiles)]"
         ""
         "Usage:"
-        "  <Invoke-LinuxLikeSSHCopyId>|<ssh-copy-id> [-f|-h|-?|-V] -i <identity_file> [-- <ssh options>] <[user@]hostname>..."
+        "  <Invoke-LinuxLikeSSHCopyId>|<ssh-copy-id> [-f|-n|-h|-?|-V] -i <identity_file> [-p <port>] [-- <ssh options> ...] <[user@]hostname>"
         ""
         "Arguments:"
-        "  <[user@]hostname> ... destination host(s) (required)"
+        "  <[user@]hostname>     destination host (required, must be the last argument)"
         ""
         "Options:"
         "  -f                    force mode: copy keys without trying to check if they are already installed"
         "  -n                    dry run: no keys are actually copied"
         # "  -s                    use sftp: use sftp instead of executing remote-commands. Can be useful if the remote only allows sftp"
         # "  -x                    debug: enables -x in this shell, for debugging"
-        "  -i <identity_file>    path to identity file (required)"
+        "  -i <identity_file>    path to identity file (required, '.pub' is appended if missing)"
+        "  -p <port>             port to connect to on the remote host"
         # ""
-        "  -- <ssh options>      additional ssh options"
+        "  -- <ssh options>      other ssh options passed as is"
         ""
         "  -h, --help, /?        print this help"
         "  -V                    print version"
         ""
         return
     }
-    if (${Version} -or (${params} | Where-Object { ${__profileVersionFlags} -contains $_ })) { "${__profileVersion}"; return }
-
-    $content = (Get-Content -Path "${IdentityFilePath}" -ErrorAction Stop) -replace "`r?`n", ""
-    $command = "mkdir -p ~/.ssh && chmod 700 ~/.ssh && printf '%s\n' '${content}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
-
-    foreach ($dst in ${Destinations}) {
-        if (${DryRun}) { Write-Output "ssh " + ((@(${SSHParams}) | ForEach-Object { "'${_}'" }) -join ' ') + " " + "'${dst}' " + "'${command}'" }
-        else { ssh @(${SSHParams}) "${dst}" "${command}" }
+    if (${Version} -or (${SSHParams} | Where-Object { ${__profileVersionFlags} -contains $_ })) {
+        "${__profileVersion}"
+        return
     }
+
+    if (-not ${IdentityFilePath}.EndsWith(".pub", [System.StringComparison]::OrdinalIgnoreCase)) { $IdentityFilePath = "${IdentityFilePath}.pub" }
+
+    $lines = @(Get-Content -Path "${IdentityFilePath}" -Encoding UTF8 -ErrorAction Stop | Where-Object { $_ })
+    $commands = @(
+        "cd"
+        "umask 077"
+        "mkdir -p .ssh"
+        "if command -v restorecon >/dev/null 2>&1; then restorecon -R .ssh; fi"
+        'if [ -s .ssh/authorized_keys ] && [ $(tail -c 1 .ssh/authorized_keys | wc -l) -eq 0 ]; then echo >> .ssh/authorized_keys; fi'
+
+        foreach ($line in $lines) {
+            $pubkey = (-split ${line})[1]
+            if (${pubkey} -notmatch '^[A-Za-z0-9+/=]+$') { throw "Invalid public key: ${line}" }
+
+            $octalLine = -join ([System.Text.Encoding]::UTF8.GetBytes("${line}`n") | ForEach-Object { '\' + [System.Convert]::ToString($_, 8) })
+            if (${Force}) { "printf '${octalLine}' >> .ssh/authorized_keys" }
+            else { "(grep -qF ${pubkey} .ssh/authorized_keys 2>/dev/null || printf '${octalLine}' >> .ssh/authorized_keys)" }
+        }
+
+        "if command -v restorecon >/dev/null 2>&1; then restorecon -R .ssh; fi"
+    )
+
+    $options = @(
+        if (${Port}) {
+            "-p"
+            "${Port}"
+        }
+        ${SSHParams}
+        ("exec sh -c '" + ((${commands} -join ' && ') -replace "'", "'\''") + "'")
+    )
+
+    if (${DryRun}) { '"ssh" "' + (${options} -join '" "') + '"' }
+    else { ssh @options }
 }
 
 function Lock-File {
