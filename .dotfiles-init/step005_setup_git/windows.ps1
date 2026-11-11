@@ -28,9 +28,9 @@ function Remove-GitPaths ([string[]]$Paths) {
 
     $path = ${Paths}[0]
     Write-Log "Path:   '${path}'"
-    if (Test-Path "${path}") {
+    if (Test-Path -LiteralPath "${path}") {
         # TODO: backup
-        Remove-Item -Path "${path}" -Force -ErrorAction Stop
+        Remove-Item -LiteralPath "${path}" -Force -ErrorAction Stop
         Write-Log " -> Removed."
     }
     else { Write-Log " -> Not found." }
@@ -39,7 +39,7 @@ function Remove-GitPaths ([string[]]$Paths) {
 
     foreach ($path in ${Paths}[1..(${Paths}.Count - 1)]) {
         Write-Log "Path:   '${path}'"
-        if (Test-Path "${path}") { Write-Log " -> Already exists." }
+        if (Test-Path -LiteralPath "${path}") { Write-Log " -> Already exists." }
         else {
             New-Item -Path "${path}" -Force > $null
             Write-Log " -> Created."

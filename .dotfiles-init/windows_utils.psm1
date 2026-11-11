@@ -1,14 +1,61 @@
 Import-Module -Name "$(Join-Path "${PSScriptRoot}" "windows.ps1")" -Force
 
-function Copy-Resource ([string]$Source, [string]$Target, [string]$TargetDir, [string]$TargetName = "${Source}") {
-    $sourcePath = "$(Join-Path (Split-Path "$((Get-PSCallStack)[1].ScriptName)") "${Source}")"
+function Backup-Resource ([string]$Source) {
+    if (-not (Test-Path -LiteralPath "${Source}")) { return $null }
 
+    $dst = Get-BackupPath "${Source}"
+
+    Write-Log " -> Back up existing file."
+    Write-Log "        Source: ${Source}"
+    Write-Log "        Target: ${dst}"
+
+    if (-not (Confirm-Action "Confirm backup?")) {
+        Write-Log " -> Aborted." "ERROR"
+        throw "Aborted by user."
+    }
+
+    if (Test-Path -LiteralPath "${dst}") { throw "Backup target already exists." }
+
+    New-Item -Path "$(Split-Path "${dst}")" -ItemType "Directory" -Force > $null
+    Move-Item -LiteralPath "${Source}" -Destination "${dst}"
+    return "${dst}"
+}
+
+function Compare-FileContent ([string]$Path1, [string]$Path2) {
+    # $algorithm = "SHA256"
+    $algorithm = "SHA512"
+    $hash1 = (Get-FileHash -LiteralPath "${Path1}" -Algorithm "${algorithm}").Hash
+    $hash2 = (Get-FileHash -LiteralPath "${Path2}" -Algorithm "${algorithm}").Hash
+    return ${hash1} -eq ${hash2}
+    # return ([System.IO.File]::ReadAllBytes("${Path1}".PSPath) -ceq [System.IO.File]::ReadAllBytes("${Path2}".PSPath))
+}
+
+function Copy-Resource {
+    param (
+        [string]$Source,
+        [string]$Target,
+        [string]$TargetDir = "$(Get-TempDir)",
+        [string]$TargetName = "$(Split-Path "${Source}" -Leaf)"
+    )
     Write-Log "Copy '${Source}' ..."
 
-    $dst = Initialize-ResourceDir "${sourcePath}" "${Target}" "${TargetDir}" "${TargetName}"
+    $src = "${Source}"
+    if (-not [System.IO.Path]::IsPathRooted("${src}")) { $src = Join-Path (Split-Path "$((Get-PSCallStack)[1].ScriptName)") "${src}" }
+    $dst = Initialize-ResourceDir "${src}" "${Target}" "${TargetDir}" "${TargetName}"
 
-    try { Copy-Item -LiteralPath "${sourcePath}" -Destination "${dst}" -Force -ErrorAction Stop }
-    catch { [System.IO.File]::WriteAllBytes("${dst}", [System.IO.File]::ReadAllBytes("${sourcePath}")) }
+    if (Test-Path -LiteralPath "${dst}") {
+        $prop = Get-ItemProperty -LiteralPath "${dst}"
+
+        if (${prop} -and (Compare-FileContent "${src}" "${dst}")) {
+            Write-Log " -> Already exists."
+            return "${dst}"
+        }
+        else { Backup-Resource -Source "${dst}" > $null }
+    }
+
+    # try { Copy-Item -LiteralPath "${src}" -Destination "${dst}" -Force -ErrorAction Stop }
+    try { Copy-Item -LiteralPath "${src}" -Destination "${dst}" -ErrorAction Stop }
+    catch { [System.IO.File]::WriteAllBytes("${dst}", [System.IO.File]::ReadAllBytes("${src}")) }
 
     Write-Log " -> Copied."
     return "${dst}"
@@ -119,7 +166,7 @@ function Initialize-ResourceDir ([string]$Source, [string]$Target, [string]$Targ
     Write-Log "    from:   '${Source}'"
     Write-Log "    to:     '${Target}'"
 
-    if ("${TargetDir}" -and (-not (Test-Path "${TargetDir}"))) {
+    if ("${TargetDir}" -and (-not (Test-Path -LiteralPath "${TargetDir}"))) {
         New-Item -Path "${TargetDir}" -ItemType "Directory" -Force > $null
     }
 
@@ -181,25 +228,28 @@ function New-SymLink {
 
     Write-Log "Create a symbolic link of '$(Split-Path "${Source}" -Leaf)' ..."
 
-    $dst = Initialize-ResourceDir "${Source}" "${Target}" "${TargetDir}" "${TargetName}"
+    $src = "${Source}"
+    if (-not [System.IO.Path]::IsPathRooted("${src}")) { $src = Join-Path (Split-Path "$((Get-PSCallStack)[1].ScriptName)") "${src}" }
+    $dst = Initialize-ResourceDir "${src}" "${Target}" "${TargetDir}" "${TargetName}"
 
-    if (Test-Path "${dst}") {
-        $prop = Get-ItemProperty "${dst}"
+    if (Test-Path -LiteralPath "${dst}") {
+        $prop = Get-ItemProperty -LiteralPath "${dst}"
 
         # NOTE: `.LinkTarget` is probably not supported in PowerShell < 7.1
-        # if (${prop} -and (${prop}.LinkTarget -eq "${Source}")) {
-        if (${prop} -and (${prop}.Target -eq "${Source}")) {
+        # if (${prop} -and (${prop}.LinkTarget -eq "${src}")) {
+        if (${prop} -and (${prop}.Target -eq "${src}")) {
             Write-Log " -> Already exists."
             return
         }
+        else { Backup-Resource -Source "${dst}" > $null }
     }
 
     # NOTE: Not working on PowerShell 5.1 even with developer mode
-    # New-Item -Path "${dst}" -Value "${Source}" -ItemType "SymbolicLink" -Force
+    # New-Item -Path "${dst}" -Value "${Source}" -ItemType "SymbolicLink"
     Start-Process -FilePath "pwsh.exe" -Verb "RunAs" -Wait -ArgumentList @(
         "-NoProfile",
         "-Command",
-        "New-Item -Path '${dst}' -Value '${Source}' -ItemType 'SymbolicLink' -Force"
+        "New-Item -Path '${dst}' -Value '${src}' -ItemType 'SymbolicLink'"
     )
 
     Write-Log " -> Created."
@@ -248,7 +298,16 @@ function Update-Path {
         $message = "Set Key: '${Key}' to Value: '${value}'"
         if (-not ${PSCmdlet}.ShouldProcess("${Path}", "${message}")) { continue }
 
-        [System.Environment]::SetEnvironmentVariable("${Key}", "${value}", "User")
+        # [System.Environment]::SetEnvironmentVariable("${Key}", "${value}", "User")
+        Set-ItemProperty -LiteralPath "${Path}" -Name "${Key}" -Value "${value}" -Type "ExpandString" -Confirm:$false
+        [DotfilesInit.User32]::SendMessageTimeout([IntPtr]0xffff, 0x001A, [UIntPtr]::Zero, "Environment", 0x0002, 1000, [IntPtr]::Zero) > $null
         if ("${Key}" -eq "Path") { Import-Path }
     }
+}
+
+if (-not ("DotfilesInit.User32" -as [type])) {
+    Add-Type -Namespace "DotfilesInit" -Name "User32" -MemberDefinition @"
+[DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode)]
+public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, IntPtr lpdwResult);
+"@
 }

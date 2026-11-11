@@ -41,15 +41,15 @@ function Enable-DeveloperMode {
 
     $path = "HKLM:\${key}"
 
-    if (Test-Path "${path}") {
-        $prop = Get-ItemProperty "${path}"
+    if (Test-Path -LiteralPath "${path}") {
+        $prop = Get-ItemProperty -LiteralPath "${path}"
         if (${prop} -and ${prop}."${value}" -eq "${data}") { return }
     }
 
     Start-Process pwsh -Verb "RunAs" -Wait -ArgumentList @(
         "-NoProfile",
         "-Command",
-        "Set-ItemProperty -Path '${path}' -Name '${value}' -Value '${data}' -PropertyType '${type}' -Force"
+        "Set-ItemProperty -LiteralPath '${path}' -Name '${value}' -Value '${data}' -PropertyType '${type}' -Force"
     )
 }
 
