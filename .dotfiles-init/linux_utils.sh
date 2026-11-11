@@ -11,6 +11,15 @@ copy_resource() {
     log "    from:   ${src}"
     log "    to:     ${dst}"
 
+    if [ -e "${dst}" ] || [ -L "${dst}" ]; then
+        if cmp -s "${src}" "${dst}"; then
+            log " -> Already exists."
+            return 0
+        fi
+
+        (backup_file "${dst}" "$(get_backup_path "${dst}")")
+    fi
+
     mkdir -p "$(dirname "${dst}")"
     cp -f "${src}" "${dst}"
 

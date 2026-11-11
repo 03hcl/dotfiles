@@ -18,6 +18,7 @@ from conftest import Remote, git, read_tree, write
 
 HERE = Path(__file__).resolve().parent
 LINUX_SH = HERE.parent / "linux.sh"
+LINUX_UTILS_SH = HERE.parent / "linux_utils.sh"
 README = HERE.parents[1] / "README.md"
 
 BUSYBOX = shutil.which("busybox")
@@ -214,3 +215,97 @@ def test_linux_sh_refuses_other_repository(remote, home):
     assert "Unexpected remote URL" in process.stdout
     assert read_tree(home, skip=(".git",)) == {".bashrc": "other bashrc\n"}
     assert not (home / ".orig").exists()
+
+
+# Backup directory: ~/.orig/<yyyymmdd_HHMMSS>_<PID>/<path relative to ~>
+BACKUP_NAME = re.compile(r"\d{8}_\d{6}_\d+")
+
+# NOTE: linux_utils.sh sources linux.sh through `git rev-parse` and uses GNU realpath options,
+#       which busybox does not have, so only copy_resource is taken out of it. realpath returns the path as is.
+COPY_RESOURCE_PROLOGUE = r"""
+set -- 0
+. "$TEST_LINUX_SH"
+confirm() { [ "$TEST_ANSWER" = y ]; }
+realpath() { while [ "${1#-}" != "${1}" ]; do shift; done; printf "%s\n" "${1}"; }
+eval "$(sed -n '/^copy_resource()/,/^}/p' "$TEST_LINUX_UTILS_SH")"
+"""
+
+
+def run_copy_resource(home: Path, src: Path, dst: Path, answer: str = "y", fails: bool = False):
+    return run_sh(
+        f'{COPY_RESOURCE_PROLOGUE}\ncopy_resource "$TEST_SRC" "$TEST_DST"\n',
+        {
+            **os.environ,
+            "HOME": home.as_posix(),
+            "TEST_LINUX_SH": LINUX_SH.as_posix(),
+            "TEST_LINUX_UTILS_SH": LINUX_UTILS_SH.as_posix(),
+            "TEST_ANSWER": answer,
+            "TEST_SRC": src.as_posix(),
+            "TEST_DST": dst.as_posix(),
+        },
+        fails,
+    )
+
+
+@pytest.fixture
+def source(tmp_path: Path) -> Path:
+    path = tmp_path / "repo" / ".dotfiles-init" / "step999_test" / "a.txt"
+    write(path, "new\n")
+    return path
+
+
+def test_copy_resource_copies_to_missing_target(home, source):
+    target = home / "x" / "a.txt"
+
+    process = run_copy_resource(home, source, target, answer="n")
+
+    assert target.read_text() == "new\n"
+    assert " -> Copied." in process.stdout
+    assert not (home / ".orig").exists()
+
+
+def test_copy_resource_skips_same_content(home, source):
+    target = home / "x" / "a.txt"
+    write(target, "new\n")
+
+    # NOTE: The answer is "n", so this fails if copy_resource asks
+    process = run_copy_resource(home, source, target, answer="n")
+
+    assert " -> Already exists." in process.stdout
+    assert not (home / ".orig").exists()
+
+
+def test_copy_resource_backs_up_different_content(home, source):
+    target = home / "x" / "a.txt"
+    write(target, "old\n")
+
+    run_copy_resource(home, source, target)
+
+    assert target.read_text() == "new\n"
+    [backup] = (home / ".orig").iterdir()
+    assert BACKUP_NAME.fullmatch(backup.name), backup
+    assert read_tree(backup) == {"x/a.txt": "old\n"}
+    assert read_tree(source.parent) == {"a.txt": "new\n"}
+
+
+def test_copy_resource_aborts_when_backup_is_declined(home, source):
+    target = home / "x" / "a.txt"
+    write(target, "old\n")
+
+    process = run_copy_resource(home, source, target, answer="n", fails=True)
+
+    assert "Aborted" in process.stdout
+    assert target.read_text() == "old\n"
+    assert not (home / ".orig").exists()
+
+
+def test_backup_name_is_shared_with_child_processes(home):
+    """Steps run as child processes (`bash "${step}"`), so they must reuse the backup name of the installer."""
+    process = run_sh(
+        'set -- 0\n. "$TEST_LINUX_SH"\nprintf "%s %s\\n" "$DOTFILES_INIT_BACKUP_NAME" "$(sh -c \'. "$TEST_LINUX_SH"; printf "%s" "$DOTFILES_INIT_BACKUP_NAME"\' sh 0)"\n',
+        {**os.environ, "HOME": home.as_posix(), "TEST_LINUX_SH": LINUX_SH.as_posix()},
+    )
+
+    parent, child = process.stdout.split()
+    assert BACKUP_NAME.fullmatch(parent), process
+    assert child == parent

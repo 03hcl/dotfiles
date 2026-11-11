@@ -2,6 +2,9 @@
 
 set -eu
 
+DOTFILES_INIT_BACKUP_DIR="${DOTFILES_INIT_BACKUP_DIR:-$(date +%Y%m%d_%H%M%S)_$$}"
+export DOTFILES_INIT_BACKUP_DIR
+
 confirm() {
     # NOTE: Read from the terminal because stdin can be a pipe (e.g. `git ls-files | while`, `curl | sh`)
     printf "%s [y/N]: " "${1}" >/dev/tty
@@ -173,6 +176,13 @@ backup_file() {
     mv "${src}" "${dst}"
 }
 
+get_backup_path() {
+    case "${1}" in
+        "${HOME}"/*) printf "%s" "${HOME}/.orig/${DOTFILES_INIT_BACKUP_DIR}/${1#"${HOME}"/}" ;;
+        *)           printf "%s" "${HOME}/.orig/${DOTFILES_INIT_BACKUP_DIR}${1}" ;;
+    esac
+}
+
 init_local_repo() {
     remote_repo="${1}"
     local_repo="${2}"
@@ -207,7 +217,7 @@ init_local_repo() {
         git -C "${local_repo}" read-tree FETCH_HEAD
         git -C "${local_repo}" update-index -q --refresh
 
-        backup_dir="${local_repo}/.orig/$(date +%Y%m%d_%H%M%S)_$$"
+        backup_dir="${local_repo}/.orig/${DOTFILES_INIT_BACKUP_DIR}"
 
         git -C "${local_repo}" -c core.quotePath=false ls-files --modified | while IFS= read -r file; do
             src="${local_repo}/${file}"
