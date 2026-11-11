@@ -3,12 +3,13 @@
 <!-- markdownlint-disable MD013 -->
 
 Tests are written in Python with [pytest](https://docs.pytest.org/).
-Each test runs on every PowerShell found (`pwsh` and Windows PowerShell 5.1 `powershell`).
+Tests of PowerShell scripts run on every PowerShell found (`pwsh` and Windows PowerShell 5.1 `powershell`).
 
 Requirements:
 
 - [uv](https://docs.astral.sh/uv/) (installed by `step009_install_python`)
-- `busybox` (installed by `step006_setup_powershell`) to emulate the remote shell; tests that need it are skipped without it
+- `git`
+- `busybox` (installed by `step006_setup_powershell`) to run shell scripts; tests that need it are skipped without it
 
 Run (takes a few minutes):
 

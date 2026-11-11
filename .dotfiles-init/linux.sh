@@ -2,6 +2,14 @@
 
 set -eu
 
+confirm() {
+    # NOTE: Read from the terminal because stdin can be a pipe (e.g. `git ls-files | while`, `curl | sh`)
+    printf "%s [y/N]: " "${1}" >/dev/tty
+    IFS= read -r response </dev/tty || return 1
+
+    [ "${response}" = "y" ] || [ "${response}" = "Y" ]
+}
+
 log() {
     time="$(date '+%Y-%m-%d %H:%M:%S.%3N %z' | sed -E 's/([+-][0-9]{2})([0-9]{2})$/(\1:\2)/')"
     case "${2:-INFO}" in
@@ -11,7 +19,7 @@ log() {
         WARNING)    color="33"; prefix="[WARNING]   ";;
         ERROR)      color="31"; prefix="[ERROR]     ";;
         FATAL)      color="35"; prefix="[FATAL]     ";;
-        *)          color="0";;
+        *)          color="0";  prefix="[UNKNOWN]   ";;
     esac
 
     printf "%b" "${1:- }" | while IFS= read -r line || [ -n "${line}" ]; do
@@ -46,9 +54,7 @@ get_distro() {
     if [ -f "/etc/os-release" ]; then
         # shellcheck source=/dev/null
         id="$(. "/etc/os-release" && printf "%s" "${ID}")"
-        if [ -z "${id}" ]; then
-            return 1
-        fi
+        [ -n "${id}" ] || return 1
 
         printf "%s" "$id"
         return 0
@@ -61,9 +67,7 @@ get_version_codename() {
     if [ -f "/etc/os-release" ]; then
         # shellcheck source=/dev/null
         codename="$(. "/etc/os-release" && printf "%s" "${VERSION_CODENAME}")"
-        if [ -z "${codename}" ]; then
-            return 1
-        fi
+        [ -n "${codename}" ] || return 1
 
         printf "%s" "$codename"
         return 0
@@ -110,8 +114,8 @@ install_base_packages() {
                 ca-certificates \
                 curl \
                 git \
-                software-properties-common \
                 wget
+                # software-properties-common
             codename="$(get_version_codename)"
             cat << EOF | sudo tee "/etc/apt/sources.list.d/dotfiles-init.sources"
 Types:          deb
@@ -150,103 +154,136 @@ step2() {
     log_command git --version
 }
 
-update_local_repo() {
-    remote="${1}"
-    local="${2}"
-    origin="${3}"
-    branch="${4}"
+backup_file() {
+    src="${1}"
+    dst="${2}"
 
-    if [ ! -d "${local}/.git" ]; then return 1; fi
-    if [ "$(git -C "${local}" remote get-url "${origin}" 2>/dev/null)" != "${remote}" ]; then return 1; fi
-    actual_branch="$(git -C "${local}" branch --show-current 2>/dev/null)"
-    if [ "${actual_branch}" != "${branch}" ]; then return 1; fi
-
-    log " -> Update repository."
-    git -C "${local}" fetch "${origin}" "${branch}"
-    git -C "${local}" checkout --detach
-    git -C "${local}" branch --force "${branch}" "${origin}/${branch}"
-    git -C "${local}" switch "${branch}"
-}
-
-backup_directory() {
-    local_repo="${1}"
-    src="${2}"
-    dst="${local_repo}-backup/$(date +%Y%m%d_%H%M%S)/$(basename "${src}")"
-
-    log " -> Failed to update source directory. Backing up to target directory."
+    log " -> Back up existing file."
     log "        Source: ${src}"
     log "        Target: ${dst}"
-    printf "Confirm backup? [y/N]: "
-    read -r response
 
-    if [ "${response}" != "y" ] && [ "${response}" != "Y" ]; then
+    if ! confirm "Confirm backup?"; then
         log " -> Aborted." "ERROR"
-        exit 1
+        return 1
     fi
 
-    log " -> Backup started."
+    [ ! -e "${dst}" ] && [ ! -L "${dst}" ] || return 1
 
-    if [ -d "$(dirname "${dst}")" ]; then
-        log " -> Failed to backup. Target directory already exists." "ERROR"
-        exit 1
-    else
-        mkdir -p "$(dirname "${dst}")"
-    fi
-
+    mkdir -p "$(dirname "${dst}")"
     mv "${src}" "${dst}"
-
-    log " -> Backup completed."
 }
 
-backup_local_repo() { backup_directory "${1}" "${1}"; }
-
-get_remote_repo() {
-    remote="${1}"
-    local="${2}"
+init_local_repo() {
+    remote_repo="${1}"
+    local_repo="${2}"
     origin="${3}"
     branch="${4}"
 
-    if [ -d "${local}" ]; then return; fi
-    log " -> Clone repository."
-    git clone "${remote}" "${local}" --origin "${origin}" --branch "${branch}"
+    if [ ! -e "${local_repo}/.git" ] && [ ! -L "${local_repo}/.git" ]; then
+        log " -> Initialize repository."
+        git init --initial-branch="${branch}" "${local_repo}"
+        git -C "${local_repo}" remote add "${origin}" "${remote_repo}"
+    fi
+
+    if [ ! -d "${local_repo}/.git" ] || [ -L "${local_repo}/.git" ]; then
+        log " -> Unexpected '.git'. Expected a directory, not a symbolic link." "ERROR"
+        log "        Path:     ${local_repo}/.git" "ERROR"
+        return 1
+    fi
+
+    actual_remote_repo="$(git -C "${local_repo}" remote get-url "${origin}")"
+    if [ "${actual_remote_repo}" != "${remote_repo}" ]; then
+        log " -> Unexpected remote URL." "ERROR"
+        log "        Actual:   ${actual_remote_repo}" "ERROR"
+        log "        Expected: ${remote_repo}" "ERROR"
+        return 1
+    fi
+
+    git -C "${local_repo}" fetch "${origin}" "${branch}"
+
+    if ! git -C "${local_repo}" rev-parse --verify HEAD >/dev/null 2>&1; then
+        log " -> Checkout repository."
+
+        git -C "${local_repo}" read-tree FETCH_HEAD
+        git -C "${local_repo}" update-index -q --refresh
+
+        backup_dir="${local_repo}/.orig/$(date +%Y%m%d_%H%M%S)_$$"
+
+        git -C "${local_repo}" -c core.quotePath=false ls-files --modified | while IFS= read -r file; do
+            src="${local_repo}/${file}"
+            [ -e "${src}" ] || [ -L "${src}" ] || continue
+
+            parent="$(dirname "${file}")"
+            while [ "${parent}" != "." ]; do
+                if [ -L "${local_repo}/${parent}" ]; then
+                    log " -> Unexpected symbolic link in the parent directories." "ERROR"
+                    log "        Path:     ${local_repo}/${parent}" "ERROR"
+                    exit 1
+                fi
+                parent="$(dirname "${parent}")"
+            done
+
+            backup_file "${src}" "${backup_dir}/${file}"
+        done
+
+        git -C "${local_repo}" checkout-index -a
+        git -C "${local_repo}" symbolic-ref HEAD "refs/heads/${branch}"
+        git -C "${local_repo}" update-ref "refs/heads/${branch}" FETCH_HEAD
+        git -C "${local_repo}" branch --set-upstream-to="${origin}/${branch}" "${branch}"
+        git -C "${local_repo}" remote set-head "${origin}" "${branch}"
+    else
+        log " -> Update repository."
+
+        remote_head="$(git -C "${local_repo}" rev-parse --verify 'FETCH_HEAD^{commit}')"
+        git -C "${local_repo}" merge-base --is-ancestor "${remote_head}" HEAD && return 0
+
+        actual_branch="$(git -C "${local_repo}" branch --show-current)"
+        if [ "${actual_branch}" != "${branch}" ]; then
+            log " -> Unexpected current branch." "ERROR"
+            log "        Actual:   ${actual_branch}" "ERROR"
+            log "        Expected: ${branch}" "ERROR"
+            return 1
+        fi
+
+        if [ -n "$(git -C "${local_repo}" status --porcelain --untracked-files=no)" ]; then
+            log " -> Uncommitted changes exist. Commit or stash them first." "ERROR"
+            return 1
+        fi
+
+        git -C "${local_repo}" merge --ff-only --no-overwrite-ignore "${remote_head}"
+    fi
 }
 
 step3() {
-    remote="${1}"
-    local="${2}"
+    remote_repo="${1}"
+    local_repo="${2}"
     origin="${3:-origin}"
     branch="${4:-main}"
 
     log_step 3 "Clone 03hcl/dotfiles Repository"
 
-    if [ -d "${local}" ]; then
-        if ! update_local_repo "${remote}" "${local}" "${origin}" "${branch}"; then
-            backup_local_repo "${local}"
-        fi
-    fi
-
-    get_remote_repo "${remote}" "${local}" "${origin}" "${branch}"
+    init_local_repo "${remote_repo}" "${local_repo}" "${origin}" "${branch}"
 }
 
 enumerate_additional_steps() {
     steps_dir="${1}"
 
-    if [ ! -d "$steps_dir" ]; then return; fi
+    [ -d "${steps_dir}" ] || return 0
 
-    for dir in "$steps_dir"/step*; do
-        [ -d "$dir" ] || continue
-        script="$dir/linux.sh"
-        [ -f "$script" ] || continue
+    for dir in "${steps_dir}"/step*; do
+        [ -d "${dir}" ] || continue
+        script="${dir}/linux.sh"
+        [ -f "${script}" ] || continue
         printf "%s\n" "$script"
     done
 }
 
 step4() {
-    local="${1}"
+    local_repo="${1}"
 
     log_step 4 "Search Additional Steps"
 
-    steps="$(enumerate_additional_steps "${local}/.dotfiles-init")"
+    steps="$(enumerate_additional_steps "${local_repo}/.dotfiles-init")"
 
     if [ -z "${steps}" ]; then
         log " -> No additional steps found."
@@ -256,19 +293,19 @@ step4() {
     count="$(printf "%s\n" "${steps}" | wc -l)"
     log " -> Found ${count} additional steps."
 
-    for step in ${steps}; do
+    printf '%s\n' "${steps}" | while IFS= read -r step; do
         # shellcheck source=/dev/null
         bash "${step}"
     done
 }
 
 initialize_dotfiles() {
-    if [ $# -ne 0 ]; then return; fi
+    [ $# -eq 0 ] || return 0
 
     log "Hello, Linux!"
 
     remote_repo_path="https://github.com/03hcl/dotfiles.git"
-    local_repo_path="${HOME}/.dotfiles"
+    local_repo_path="${HOME}"
 
     step1
     step2

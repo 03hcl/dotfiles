@@ -53,6 +53,7 @@ restorecon
 ```plaintext
 defaultbranch
 excludesfile
+GIT_CONFIG_NOSYSTEM
 rerere
 safecrlf
 sslcainfo
