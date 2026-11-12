@@ -11,27 +11,31 @@ function Update-VSCodeConfig {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param([string]$Name)
 
-    $target = Join-Path "${env:APPDATA}\Code\User" "${Name}"
+    if ($Name -eq "argv.json") { $targetDir = "${env:USERPROFILE}\.vscode" }
+    else { $targetDir = "${env:APPDATA}\Code\User" }
+
+    $target = Join-Path "${targetDir}" "${Name}"
+
     if (${PSCmdlet}.ShouldProcess("${target}", "Apply VS Code user configuration")) {
         Copy-Resource -Source "${Name}" -Target "${target}" > $null
     }
 }
 
-function Update-VSCodeSnippets {
+function Update-VSCodeConfigDirectory {
     [CmdletBinding(SupportsShouldProcess = $true)]
-    param()
+    param([string]$Name)
 
-    $sourceDir = Join-Path "${PSScriptRoot}" "snippets"
-    $targetDir = Join-Path "${env:APPDATA}\Code\User" "snippets"
+    $sourceDir = Join-Path "${PSScriptRoot}" "${Name}"
+    $targetDir = Join-Path "${env:APPDATA}\Code\User" "${Name}"
 
-    if (${PSCmdlet}.ShouldProcess("${targetDir}", "Apply VS Code user snippets")) {
+    if (${PSCmdlet}.ShouldProcess("${targetDir}", "Apply VS Code user configuration directory")) {
         New-Item -Path "${targetDir}" -ItemType "Directory" -Force > $null
         Get-ChildItem -LiteralPath "${sourceDir}" -File -Recurse `
         | Where-Object { $_.Name -ne ".gitignore" } `
         | ForEach-Object {
             $relativePath = $_.FullName.Substring("${sourceDir}".Length).TrimStart([char[]]@("\", "/"))
             $target = Join-Path "${targetDir}" "${relativePath}"
-            $source = Join-Path "snippets" "${relativePath}"
+            $source = Join-Path "${Name}" "${relativePath}"
             Copy-Resource -Source "${source}" -Target "${target}" > $null
         }
     }
@@ -76,10 +80,14 @@ function Step8 {
     if (-not ${WhatIfPreference}) { Write-CommandLog { code --version } }
 
     Update-VSCodeConfig -Name "argv.json"
+    Update-VSCodeConfig -Name "chatLanguageModels.json"
     Update-VSCodeConfig -Name "keybindings.json"
+    Update-VSCodeConfig -Name "mcp.json"
     Update-VSCodeConfig -Name "settings.json"
+    Update-VSCodeConfig -Name "tasks.json"
 
-    Update-VSCodeSnippets
+    Update-VSCodeConfigDirectory -Name "snippets"
+    Update-VSCodeConfigDirectory -Name "prompts"
 
     Write-Step 8 "Install Extensions for Visual Studio Code"
 

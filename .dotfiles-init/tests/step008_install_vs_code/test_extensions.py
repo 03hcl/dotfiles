@@ -13,6 +13,10 @@ SHELLS = [shell for shell in ("pwsh", "powershell") if shutil.which(shell)]
 
 
 def run_powershell(shell: str, script: str) -> subprocess.CompletedProcess[str]:
+    script = f"""
+        Import-Module -Name {ps_literal(STEP.parent.parent / "windows_utils.psm1")} -Force
+        {script}
+    """
     encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
     env = {
         key: value for key, value in os.environ.items() if key.upper() != "PSMODULEPATH"
@@ -68,6 +72,7 @@ def test_installs_jsonc_recommendations(shell: str, tmp_path: Path) -> None:
         function global:code {{
             $global:calls++
             $global:installArgs = @($args)
+            $global:LASTEXITCODE = 0
         }}
         Install-VSCodeExtensions -Path {ps_literal(config)}
         if ($global:calls -ne 1) {{ throw "Expected one CLI invocation" }}
@@ -77,9 +82,9 @@ def test_installs_jsonc_recommendations(shell: str, tmp_path: Path) -> None:
     result = run_powershell(shell, script)
 
     assert result.returncode == 0, result
-    assert result.stdout.strip() == (
-        '["--force","--install-extension","publisher.first",'
-        '"--install-extension","publisher.second"]'
+    assert result.stdout.strip().splitlines()[-1] == (
+        '["--install-extension","publisher.first",'
+        '"--install-extension","publisher.second","--force"]'
     )
 
 
@@ -119,6 +124,7 @@ def test_scopes_warning_suppression(
         $failed = $false
         function global:code {{
             $global:observedOptions = $env:NODE_OPTIONS
+            $global:LASTEXITCODE = 0
             {"throw 'Test install failure'" if fail else ""}
         }}
         try {{ Install-VSCodeExtensions -Path {ps_literal(config)} }}
@@ -135,7 +141,57 @@ def test_scopes_warning_suppression(
 
     assert result.returncode == 0, result
     expected = f"{original_options or ''} --disable-warning=DEP0169".strip()
-    assert result.stdout.strip() == expected
+    assert result.stdout.strip().splitlines()[-1] == expected
+
+
+@pytest.mark.parametrize("shell", SHELLS)
+@pytest.mark.parametrize("exit_code", [0, 7])
+def test_native_cli_exit_code(shell: str, tmp_path: Path, exit_code: int) -> None:
+    config = tmp_path / "extensions.json"
+    config.write_text('{"recommendations":["publisher.first"]}', encoding="utf-8")
+    script = f"""
+        $ErrorActionPreference = "Stop"
+        Set-StrictMode -Version 3.0
+        {load_function("Install-VSCodeExtensions")}
+        $env:NODE_OPTIONS = "--trace-warnings"
+        function global:code {{ & $env:ComSpec /d /c "exit {exit_code}" }}
+        try {{ Install-VSCodeExtensions -Path {ps_literal(config)} }}
+        finally {{
+            if ($env:NODE_OPTIONS -cne "--trace-warnings") {{
+                throw "NODE_OPTIONS was not restored"
+            }}
+        }}
+    """
+
+    result = run_powershell(shell, script)
+
+    if exit_code:
+        assert result.returncode != 0
+        assert f"exit code: {exit_code}" in result.stderr + result.stdout
+    else:
+        assert result.returncode == 0, result
+    assert "NODE_OPTIONS was not restored" not in result.stderr + result.stdout
+
+
+@pytest.mark.parametrize("shell", SHELLS)
+def test_version_failure_stops_before_configuration(shell: str) -> None:
+    script = f"""
+        $ErrorActionPreference = "Stop"
+        Set-StrictMode -Version 3.0
+        {load_function("Step8")}
+        function Write-Step {{}}
+        function Update-WinGetPackage {{}}
+        function Import-Path {{}}
+        function global:code {{ & $env:ComSpec /d /c "exit 9" }}
+        function Update-VSCodeConfig {{ throw "Configuration must not run" }}
+        Step8
+    """
+
+    result = run_powershell(shell, script)
+
+    assert result.returncode != 0
+    assert "Command failed (exit code: 9): code --version" in result.stderr + result.stdout
+    assert "Configuration must not run" not in result.stderr + result.stdout
 
 
 @pytest.mark.parametrize("shell", SHELLS)

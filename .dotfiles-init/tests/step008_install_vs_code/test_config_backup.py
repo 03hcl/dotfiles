@@ -19,28 +19,54 @@ def ps_literal(path: Path) -> str:
 
 
 @pytest.mark.parametrize("shell", SHELLS)
-def test_vscode_config_copies_back_up_existing_files(shell: str, tmp_path: Path) -> None:
+@pytest.mark.parametrize("populated_directories", [False, True])
+@pytest.mark.parametrize("what_if", [False, True])
+def test_vscode_config_copies_back_up_existing_files(
+    shell: str, tmp_path: Path, populated_directories: bool, what_if: bool
+) -> None:
     home = tmp_path / "home"
     appdata = home / "AppData" / "Roaming"
     user_config = appdata / "Code" / "User"
     step = tmp_path / "step008"
-    (step / "snippets").mkdir(parents=True)
-
-    for name in ("argv.json", "keybindings.json", "settings.json"):
-        (step / name).write_text(f'{{"source":"{name}"}}', encoding="utf-8")
-        target = user_config / name
+    expected = {}
+    existing = {}
+    for name in (
+        "argv.json",
+        "keybindings.json",
+        "settings.json",
+        "tasks.json",
+        "mcp.json",
+        "chatLanguageModels.json",
+    ):
+        content = (STEP_DIR / name).read_text(encoding="utf-8")
+        (step / name).parent.mkdir(parents=True, exist_ok=True)
+        (step / name).write_text(content, encoding="utf-8")
+        target = home / ".vscode" / name if name == "argv.json" else user_config / name
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(f'{{"existing":"{name}"}}', encoding="utf-8")
+        existing[target] = f'{{"existing":"{name}"}}'
+        target.write_text(existing[target], encoding="utf-8")
+        expected[target] = content
 
-    (step / "snippets" / "sample.code-snippets").write_text(
-        '{"sample":{"prefix":"sample","body":"new"}}', encoding="utf-8"
-    )
-    snippet_target = user_config / "snippets" / "sample.code-snippets"
-    snippet_target.parent.mkdir(parents=True)
-    snippet_target.write_text(
-        '{"sample":{"prefix":"sample","body":"old"}}', encoding="utf-8"
-    )
+    for directory, name in (
+        ("snippets", "sample.code-snippets"),
+        ("prompts", "nested/sample.prompt.md"),
+    ):
+        (step / directory).mkdir()
+        (step / directory / ".gitignore").write_text("", encoding="utf-8")
+        if populated_directories:
+            source_file = step / directory / name
+            source_file.parent.mkdir(parents=True, exist_ok=True)
+            source_file.write_text("new", encoding="utf-8")
+            target = user_config / directory / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("old", encoding="utf-8")
+            existing[target] = "old"
+            expected[target] = "new"
 
+    unrelated = user_config / "prompts" / "local.prompt.md"
+    unrelated.parent.mkdir(parents=True, exist_ok=True)
+    unrelated.write_text("keep", encoding="utf-8")
+    (step / "extensions.json").write_text('{"recommendations":[]}', encoding="utf-8")
     source = (STEP_DIR / "windows.ps1").read_text(encoding="utf-8")
     assert ENTRY_POINT in source
     (step / "windows.ps1").write_text(source.split(ENTRY_POINT, 1)[0], encoding="utf-8")
@@ -53,11 +79,12 @@ def test_vscode_config_copies_back_up_existing_files(shell: str, tmp_path: Path)
         function global:Read-Host {{ "y" }}
         Import-Module -Name {ps_literal(INIT_DIR / "windows_utils.psm1")} -Force
         . {ps_literal(step / "windows.ps1")}
+        function Update-WinGetPackage {{}}
+        function Import-Path {{}}
+        function code {{ & $env:ComSpec /d /c "exit 0" }}
 
-        Update-VSCodeConfig -Name "argv.json"
-        Update-VSCodeConfig -Name "keybindings.json"
-        Update-VSCodeConfig -Name "settings.json"
-        Update-VSCodeSnippets
+        Step8 {"-WhatIf" if what_if else ""}
+        Step8 {"-WhatIf" if what_if else ""}
     """
     encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
     env = {key: value for key, value in os.environ.items() if key.upper() != "PSMODULEPATH"}
@@ -71,10 +98,18 @@ def test_vscode_config_copies_back_up_existing_files(shell: str, tmp_path: Path)
     )
 
     assert result.returncode == 0, result
-    assert (user_config / "argv.json").read_text() == '{"source":"argv.json"}'
-    assert (user_config / "keybindings.json").read_text() == '{"source":"keybindings.json"}'
-    assert (user_config / "settings.json").read_text() == '{"source":"settings.json"}'
-    assert snippet_target.read_text() == '{"sample":{"prefix":"sample","body":"new"}}'
+    assert unrelated.read_text() == "keep"
+    assert not (user_config / "argv.json").exists()
+    for directory in ("snippets", "prompts"):
+        assert not (user_config / directory / ".gitignore").exists()
+        if not what_if:
+            assert (user_config / directory).is_dir()
+    for target, content in (existing if what_if else expected).items():
+        assert target.read_text(encoding="utf-8") == content
+
+    if what_if:
+        assert not (home / ".orig").exists()
+        return
 
     [backup_dir] = (home / ".orig").iterdir()
     assert {
@@ -82,10 +117,6 @@ def test_vscode_config_copies_back_up_existing_files(shell: str, tmp_path: Path)
         for path in backup_dir.rglob("*")
         if path.is_file()
     } == {
-        "AppData/Roaming/Code/User/argv.json": '{"existing":"argv.json"}',
-        "AppData/Roaming/Code/User/keybindings.json": '{"existing":"keybindings.json"}',
-        "AppData/Roaming/Code/User/settings.json": '{"existing":"settings.json"}',
-        "AppData/Roaming/Code/User/snippets/sample.code-snippets": (
-            '{"sample":{"prefix":"sample","body":"old"}}'
-        ),
+        target.relative_to(home).as_posix(): content
+        for target, content in existing.items()
     }
