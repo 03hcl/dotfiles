@@ -7,6 +7,63 @@ Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
+function Update-VSCodeConfig {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param([string]$Name)
+
+    $target = Join-Path "${env:APPDATA}\Code\User" "${Name}"
+    if (${PSCmdlet}.ShouldProcess("${target}", "Apply VS Code user configuration")) {
+        Copy-Resource -Source "${Name}" -Target "${target}" > $null
+    }
+}
+
+function Update-VSCodeSnippets {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
+
+    $sourceDir = Join-Path "${PSScriptRoot}" "snippets"
+    $targetDir = Join-Path "${env:APPDATA}\Code\User" "snippets"
+
+    if (${PSCmdlet}.ShouldProcess("${targetDir}", "Apply VS Code user snippets")) {
+        New-Item -Path "${targetDir}" -ItemType "Directory" -Force > $null
+        Get-ChildItem -LiteralPath "${sourceDir}" -File -Recurse `
+        | Where-Object { $_.Name -ne ".gitignore" } `
+        | ForEach-Object {
+            $relativePath = $_.FullName.Substring("${sourceDir}".Length).TrimStart([char[]]@("\", "/"))
+            $target = Join-Path "${targetDir}" "${relativePath}"
+            $source = Join-Path "snippets" "${relativePath}"
+            Copy-Resource -Source "${source}" -Target "${target}" > $null
+        }
+    }
+}
+
+function Install-VSCodeExtensions {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param([string]$Path = (Join-Path "${PSScriptRoot}" "extensions.json"))
+
+    $json = Get-Content -LiteralPath "${Path}" -Raw
+    $json = [regex]::Replace($json, '(?s)/\*.*?\*/|//[^\r\n]*', '')
+    $json = $json -replace ',\s*\]', ']' -replace ',\s*\}', '}'
+
+    $extensions = (ConvertFrom-Json -InputObject "${json}").recommendations
+
+    $installArgs = @()
+    foreach ($extension in ${extensions}) {
+        if (${PSCmdlet}.ShouldProcess("${extension}", "Install VS Code extension")) {
+            $installArgs += "--install-extension", $extension
+        }
+    }
+    if ($installArgs.Count -eq 0) { return }
+
+    $optBackUp = $env:NODE_OPTIONS
+    try {
+        # NOTE: Suppress only the VS Code CLI's legacy URL warning.
+        $env:NODE_OPTIONS = "${optBackUp} --disable-warning=DEP0169".Trim()
+        code @installArgs --force
+    }
+    finally { $env:NODE_OPTIONS = $optBackUp }
+}
+
 function Step8 {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Args)
@@ -18,13 +75,15 @@ function Step8 {
 
     if (-not ${WhatIfPreference}) { Write-CommandLog { code --version } }
 
+    Update-VSCodeConfig -Name "argv.json"
+    Update-VSCodeConfig -Name "keybindings.json"
+    Update-VSCodeConfig -Name "settings.json"
+
+    Update-VSCodeSnippets
+
     Write-Step 8 "Install Extensions for Visual Studio Code"
 
-    foreach ($extension in @("mhutchie.git-graph", "ms-ceintl.vscode-language-pack-ja", "ms-vscode.powershell")) {
-        if (${PSCmdlet}.ShouldProcess("${extension}", "Install VS Code extension")) {
-            code --install-extension "${extension}" --force
-        }
-    }
+    Install-VSCodeExtensions
 }
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
