@@ -58,7 +58,7 @@ function Install-BusyBox {
     New-WinGetPackageLink -Id "frippery.busybox-w32" -Command "busybox"
     Import-Path
 
-    Write-CommandLog { busybox | busybox head -n 2 }
+    if (-not ${WhatIfPreference}) { Write-CommandLog { busybox | busybox head -n 2 } }
 }
 
 function Install-Cygwin {
@@ -135,7 +135,7 @@ function Install-Jq {
     New-WinGetPackageLink -Id "jqlang.jq" -Command "jq"
     Import-Path
 
-    Write-CommandLog { jq --version }
+    if (-not ${WhatIfPreference}) { Write-CommandLog { jq --version } }
 }
 
 function Step6 {
@@ -148,7 +148,7 @@ function Step6 {
     Update-PowerShellProfile
     Update-ExecutionPolicy
 
-    . ${PROFILE}.CurrentUserAllHosts
+    if (-not ${WhatIfPreference}) { . ${PROFILE}.CurrentUserAllHosts }
 
     # Enable-DeveloperMode
 
@@ -169,5 +169,5 @@ function Step6 {
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
     Import-Module -Name "$(Join-Path ("${PSCommandPath}" | Split-Path | Split-Path) "windows_utils.psm1")" -Force
-    Step6 @PSBoundParameters -Args ${Args}
+    Step6 @PSBoundParameters
 }

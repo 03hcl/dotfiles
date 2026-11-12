@@ -1,5 +1,8 @@
 #!/usr/bin/env pwsh
 
+[CmdletBinding(SupportsShouldProcess = $true)]
+param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Args)
+
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -13,6 +16,9 @@ function Remove-AppAlias ([string]$FileName) {
 }
 
 function Step9 {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Args)
+
     Write-Step 9 "Install Python 3.12"
 
     Update-WinGetPackage "Python.Python.3.12"
@@ -44,5 +50,5 @@ function Step9 {
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
     Import-Module -Name "$(Join-Path ("${PSCommandPath}" | Split-Path | Split-Path) "windows_utils.psm1")" -Force
-    Step9 -Args $args
+    Step9 @PSBoundParameters
 }

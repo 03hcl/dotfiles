@@ -1,6 +1,9 @@
 Import-Module -Name "$(Join-Path "${PSScriptRoot}" "windows.ps1")" -Force
 
-function Backup-Resource ([string]$Source) {
+function Backup-Resource {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param([string]$Source)
+
     if (-not (Test-Path -LiteralPath "${Source}")) { return $null }
 
     $dst = Get-BackupPath "${Source}"
@@ -8,6 +11,8 @@ function Backup-Resource ([string]$Source) {
     Write-Log " -> Back up existing file."
     Write-Log "        Source: ${Source}"
     Write-Log "        Target: ${dst}"
+
+    if (-not ${PSCmdlet}.ShouldProcess("${Source}", "Back up to '${dst}'")) { return $null }
 
     if (-not (Confirm-Action "Confirm backup?")) {
         Write-Log " -> Aborted." "ERROR"
@@ -85,7 +90,7 @@ function Get-LatestGitHubAsset ([string]$Owner, [string]$Repo, [string]$AssetNam
     Write-Log "    from:   '${source}'"
     Write-Log "    to:     '${target}'"
 
-    Invoke-WithoutProgress { Invoke-WebRequest -Uri "${source}" -OutFile "${target}" }
+    Invoke-WithoutProgress { Invoke-WebRequest -Uri "${source}" -OutFile "${target}" -UseBasicParsing }
 
     Write-Log
     Write-Log " -> Downloaded."
@@ -108,7 +113,7 @@ function Get-OnlineResource {
     Write-Log "Download '${Source}' ..."
 
     $dst = Initialize-ResourceDir "${Source}" "${Target}" "${TargetDir}" "${TargetName}"
-    Invoke-WithoutProgress { Invoke-WebRequest -Uri "${Source}" -OutFile "${dst}" }
+    Invoke-WithoutProgress { Invoke-WebRequest -Uri "${Source}" -OutFile "${dst}" -UseBasicParsing }
 
     Write-Log " -> Downloaded."
     return "${dst}"
@@ -219,6 +224,7 @@ function Invoke-WithoutProgress ([ScriptBlock]$Script) {
 }
 
 function New-SymLink {
+    [CmdletBinding(SupportsShouldProcess = $true)]
     param (
         [string]$Source,
         [string]$Target,
@@ -244,15 +250,18 @@ function New-SymLink {
         else { Backup-Resource -Source "${dst}" > $null }
     }
 
-    # NOTE: Not working on PowerShell 5.1 even with developer mode
-    # New-Item -Path "${dst}" -Value "${Source}" -ItemType "SymbolicLink"
-    Start-Process -FilePath "pwsh.exe" -Verb "RunAs" -Wait -ArgumentList @(
-        "-NoProfile",
-        "-Command",
-        "New-Item -Path '${dst}' -Value '${src}' -ItemType 'SymbolicLink'"
-    )
+    if (${PSCmdlet}.ShouldProcess("${dst}", "Create symbolic link to '${src}'")) {
+        # NOTE: Not working on PowerShell 5.1 even with developer mode
+        # New-Item -Path "${dst}" -Value "${Source}" -ItemType "SymbolicLink"
+        Start-Process -FilePath "pwsh.exe" -Verb "RunAs" -Wait -ArgumentList @(
+            "-NoProfile",
+            "-Command",
+            "New-Item -Path '${dst}' -Value '${src}' -ItemType 'SymbolicLink'"
+        )
 
-    Write-Log " -> Created."
+        Write-Log " -> Created."
+    }
+
     return "${dst}"
 }
 

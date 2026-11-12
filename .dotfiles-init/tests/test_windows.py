@@ -39,6 +39,28 @@ if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSC
 }
 """
 
+# A step written like step006 and step007, which pass -WhatIf and the other arguments to the step function
+TEST_STEP_WITH_PARAMS = r"""
+[CmdletBinding(SupportsShouldProcess = $true)]
+param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Args)
+
+Set-StrictMode -Version 3.0
+$ErrorActionPreference = "Stop"
+
+function Step998 {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Args)
+
+    Write-Step 998 "Test Step With Parameters"
+    Write-Log "Args: $(@(${Args}) -join ',') WhatIf: ${WhatIfPreference}"
+}
+
+if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
+    Import-Module -Name "$(Join-Path ("${PSCommandPath}" | Split-Path | Split-Path) "windows_utils.psm1")" -Force
+    Step998 @PSBoundParameters
+}
+"""
+
 REMOTE_FILES = {
     ".dotfiles-init/windows.ps1": (INIT_DIR / "windows.ps1").read_text(encoding="utf-8"),
     ".dotfiles-init/windows_utils.psm1": (INIT_DIR / "windows_utils.psm1").read_text(encoding="utf-8"),
@@ -210,3 +232,21 @@ def test_runs_step_alone(run, tmp_path, operator):
     assert f"Temp: {os.environ['TEMP']}\\.dotfiles-init" in result.stdout, result
     assert "Hello, Windows!" not in result.stdout, result
     assert result.winget_calls == []
+
+
+@pytest.mark.parametrize(
+    "args, expected",
+    [("", "Args:  WhatIf: False"), ("-WhatIf a b", "Args: a,b WhatIf: True")],
+    ids=["no-args", "what-if-and-args"],
+)
+def test_runs_step_with_parameters(run, tmp_path, args, expected):
+    for name, text in REMOTE_FILES.items():
+        write(tmp_path / "repo" / name, text)
+    step = tmp_path / "repo" / ".dotfiles-init" / "step998_test" / "windows.ps1"
+    write(step, TEST_STEP_WITH_PARAMS)
+
+    result = run(f'& "{step}" {args}')
+
+    assert result.returncode == 0, result
+    assert result.stdout.count("Step 998: Test Step With Parameters") == 1, result
+    assert expected in result.stdout, result

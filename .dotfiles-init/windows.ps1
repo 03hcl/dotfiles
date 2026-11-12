@@ -86,7 +86,10 @@ function Step1 {
     Write-CommandLog { winget --version }
 }
 
-function Update-WinGetPackage([string]$Id, [string]$Source = "winget", [string]$Scope = "") {
+function Update-WinGetPackage {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param([string]$Id, [string]$Source = "winget", [string]$Scope = "")
+
     # $command = "winget list --source '${Source}' --id '${Id}'"
     # $installed = Write-CommandLog ([ScriptBlock]::Create($command)) -IsDirectOutput $true | Select-String '^[-]+$'
 
@@ -97,7 +100,9 @@ function Update-WinGetPackage([string]$Id, [string]$Source = "winget", [string]$
     # $command = "winget ${subcommand} --silent --exact --source '${Source}' --id '${Id}'"
     if (${Scope}) { $command += " --scope ${Scope}" }
 
-    Write-CommandLog ([ScriptBlock]::Create(${command})) -IsDirectOutput $true
+    if (${PSCmdlet}.ShouldProcess("${Id}", "${command}")) {
+        Write-CommandLog ([ScriptBlock]::Create(${command})) -IsDirectOutput $true
+    }
 }
 
 function Step2 {

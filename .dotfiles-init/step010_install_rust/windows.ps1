@@ -1,30 +1,43 @@
 #!/usr/bin/env pwsh
 
+[CmdletBinding(SupportsShouldProcess = $true)]
+param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Args)
+
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 function Install-Rust {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
+
     $uri = "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe"
     $file = "${env:TEMP}\rustup-init.exe"
 
-    Invoke-WebRequest -Uri "${uri}" -OutFile "${file}"
-    $target = "x86_64-pc-windows-gnu"
-    & "${file}" -y --default-host "${target}"  # --default-toolchain "stable-${target}"
-    Update-Path "%USERPROFILE%\.cargo\bin"
+    if (${PSCmdlet}.ShouldProcess("Rust toolchain", "Download rustup and install")) {
+        Invoke-WebRequest -Uri "${uri}" -OutFile "${file}"
+        $target = "x86_64-pc-windows-gnu"
+        & "${file}" -y --default-host "${target}"  # --default-toolchain "stable-${target}"
+        Update-Path "%USERPROFILE%\.cargo\bin"
 
-    Write-CommandLog { rustup --version }
+        Write-CommandLog { rustup --version }
+    }
 }
 
 function Update-Rust {
-    rustup update
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
 
-    Write-CommandLog { rustup --version }
-    Write-CommandLog { rustc --version }
-    Write-CommandLog { cargo --version }
-    Write-CommandLog { cargo fmt --version }
-    # Write-CommandLog { rustfmt --version }
-    Write-CommandLog { cargo clippy --version }
+    if (${PSCmdlet}.ShouldProcess("Rust toolchain", "Run rustup update")) { rustup update }
+
+    if (-not ${WhatIfPreference}) {
+        Write-CommandLog { rustup --version }
+        Write-CommandLog { rustc --version }
+        Write-CommandLog { cargo --version }
+        Write-CommandLog { cargo fmt --version }
+        # Write-CommandLog { rustfmt --version }
+        Write-CommandLog { cargo clippy --version }
+    }
 }
 
 # function Install-VSBuildTools {
@@ -36,11 +49,19 @@ function Update-Rust {
 # }
 
 function Install-RustOfficialTools {
-    rustup component add rust-analyzer
-    Write-CommandLog { rust-analyzer --version }
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
+
+    if (${PSCmdlet}.ShouldProcess("rust-analyzer", "Install rustup component")) {
+        rustup component add rust-analyzer
+    }
+    if (-not ${WhatIfPreference}) { Write-CommandLog { rust-analyzer --version } }
 }
 
 function Install-RustUnofficialTools {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
+
     # cargo install --force ...
     # 候補:
     #   cargo-edit
@@ -60,25 +81,34 @@ function Install-RustUnofficialTools {
     # Reference:
     #   https://crates.io/crates/cargo-script
     #   https://github.com/DanielKeep/cargo-script
-    cargo install --force cargo-script
-    Write-CommandLog { cargo script --version }
+    if (${PSCmdlet}.ShouldProcess("cargo-script", "Install Cargo package")) {
+        cargo install --force cargo-script
+    }
+    if (-not ${WhatIfPreference}) { Write-CommandLog { cargo script --version } }
     # Write-CommandLog { cargo-script --version }
     # Write-CommandLog { run-cargo-script --version }
 
     # Reference:
     #   https://crates.io/crates/cargo-audit
     #   https://github.com/RustSec/rustsec/tree/main/cargo-audit
-    cargo install --force cargo-audit
-    Write-CommandLog { cargo audit --version }
+    if (${PSCmdlet}.ShouldProcess("cargo-audit", "Install Cargo package")) {
+        cargo install --force cargo-audit
+    }
+    if (-not ${WhatIfPreference}) { Write-CommandLog { cargo audit --version } }
 
     # Reference:
     #   https://crates.io/crates/cargo-outdated
     #   https://github.com/kbknapp/cargo-outdated
-    cargo install --force cargo-outdated
-    Write-CommandLog { cargo outdated --version }
+    if (${PSCmdlet}.ShouldProcess("cargo-outdated", "Install Cargo package")) {
+        cargo install --force cargo-outdated
+    }
+    if (-not ${WhatIfPreference}) { Write-CommandLog { cargo outdated --version } }
 }
 
 function Step10 {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Args)
+
     Write-Step 10 "Install Rust"
 
     Install-Rust
@@ -90,5 +120,5 @@ function Step10 {
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
     Import-Module -Name "$(Join-Path ("${PSCommandPath}" | Split-Path | Split-Path) "windows_utils.psm1")" -Force
-    Step10 -Args $args
+    Step10 @PSBoundParameters
 }

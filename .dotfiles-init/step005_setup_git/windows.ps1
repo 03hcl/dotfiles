@@ -1,5 +1,8 @@
 #!/usr/bin/env pwsh
 
+[CmdletBinding(SupportsShouldProcess = $true)]
+param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Args)
+
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -47,7 +50,12 @@ function Remove-GitPaths ([string[]]$Paths) {
     }
 }
 
-function Set-GitConfig ([string]$Path) {
+function Set-GitConfig {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param([string]$Path)
+
+    if (-not ${PSCmdlet}.ShouldProcess("${Path}", "Create and configure Git config")) { return }
+
     Write-Log "Path:   '${Path}'"
     New-Item -Path "${Path}" -Force > $null
     Write-Log " -> Created."
@@ -105,6 +113,9 @@ function Update-GitIgnore {
 }
 
 function Step5 {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param([Parameter(ValueFromRemainingArguments = $true)][object[]]$Args)
+
     Write-Step 5 "Setup Git"
 
     Update-GitConfig
@@ -124,5 +135,5 @@ function Step5 {
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {
     Import-Module -Name "$(Join-Path ("${PSCommandPath}" | Split-Path | Split-Path) "windows_utils.psm1")" -Force
-    Step5 -Args $args
+    Step5 @PSBoundParameters
 }
