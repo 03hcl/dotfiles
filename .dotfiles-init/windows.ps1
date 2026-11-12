@@ -1,5 +1,8 @@
 #!/usr/bin/env pwsh
 
+[CmdletBinding()]
+param([int]$MaxStep)
+
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -175,14 +178,18 @@ function Step3 ([string]$Remote, [string]$Local, [string]$Origin = "origin", [st
     Get-RemoteRepo "${Remote}" "${Local}" "${Origin}" "${Branch}"
 }
 
-function Step4 ([string]$Local) {
+function Step4 ([string]$Local, [int]$MaxStep) {
     Write-Step 4 "Search Additional Steps"
 
-    $steps = @(Get-ChildItem -LiteralPath (Join-Path "${Local}" ".dotfiles-init") -Filter "step*" -Directory | Sort-Object)
+    $steps = @(
+        Get-ChildItem -LiteralPath (Join-Path "${Local}" ".dotfiles-init") -Filter "step*" -Directory `
+        | Where-Object { ($_.Name -match "^step(\d+)") -and ([int]$Matches[1] -le ${MaxStep}) } `
+        | Sort-Object
+    )
 
     if (${steps}) {
         Write-Log ($steps | Format-Table -AutoSize | Out-String)
-        Write-Log (" -> Found $(${steps}.Count) additional steps.")
+        Write-Log (" -> Found $(${steps}.Count) additional steps to run.")
         Set-ExecutionPolicy -ExecutionPolicy "RemoteSigned" -Scope "Process"
     }
     else { Write-Log " -> No additional steps found." }
@@ -195,6 +202,14 @@ function Step4 ([string]$Local) {
 }
 
 function Initialize-Dotfiles {
+    param(
+        [ValidateRange(1, 2147483647)]
+        [int]$MaxStep = $(
+            if ($env:DOTFILES_INIT_MAX_STEP) { $env:DOTFILES_INIT_MAX_STEP }
+            else { [int]::MaxValue }
+        )
+    )
+
     Write-Log "Hello, Windows!"
 
     Remove-Variable -Name "DotfilesInitBackupDir" -Scope "Global" -ErrorAction "SilentlyContinue"
@@ -202,10 +217,10 @@ function Initialize-Dotfiles {
     $remoteRepoPath = "https://github.com/03hcl/dotfiles.git"
     $localRepoPath = Join-Path "${env:USERPROFILE}" ".dotfiles"
 
-    Step1
-    Step2
-    Step3 "${remoteRepoPath}" "${localRepoPath}"
-    Step4 "${localRepoPath}"
+    if (${MaxStep} -ge 1) { Step1 }
+    if (${MaxStep} -ge 2) { Step2 }
+    if (${MaxStep} -ge 3) { Step3 "${remoteRepoPath}" "${localRepoPath}" }
+    if (${MaxStep} -ge 4) { Step4 "${localRepoPath}" ${MaxStep} }
 
     Write-Log
     Write-Log ("=" * 72)
@@ -213,4 +228,4 @@ function Initialize-Dotfiles {
     Write-Log ("=" * 72)
 }
 
-if (-not ${MyInvocation}.ScriptName) { Initialize-Dotfiles -Args ${args} }
+if (-not ${MyInvocation}.ScriptName) { Initialize-Dotfiles @PSBoundParameters }

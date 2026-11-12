@@ -24,6 +24,7 @@ stackdump
 ```plaintext
 LASTEXITCODE
 PSHOME
+useb
 ```
 
 ### WinGet
