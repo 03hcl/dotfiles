@@ -11,7 +11,7 @@ iwr -useb "https://raw.githubusercontent.com/03hcl/dotfiles/refs/heads/main/.dot
 Update:
 
 ```powershell
-& "$HOME\.dotfiles\.dotfiles-init\windows.ps1"
+& "$HOME\.dotfiles-init\windows.ps1"
 ```
 
 Run through a specific step:
@@ -23,5 +23,5 @@ iwr -useb "https://raw.githubusercontent.com/03hcl/dotfiles/refs/heads/main/.dot
 Remove-Item Env:\DOTFILES_INIT_MAX_STEP
 
 # Only execute
-& "$HOME\.dotfiles\.dotfiles-init\windows.ps1" -MaxStep 1
+& "$HOME\.dotfiles-init\windows.ps1" -MaxStep 1
 ```

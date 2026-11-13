@@ -29,6 +29,35 @@ function global:Read-Host {{ Write-Host "$args"; $env:TEST_ANSWER }}
 KEY = "TestPath"
 
 
+@pytest.mark.parametrize("scenario", ["move", "declined", "existing-target"])
+def test_backup_file_moves_only_after_confirmation_to_unused_target(run, home, scenario):
+    source = home / "source.txt"
+    target = home / "backup" / "source.txt"
+    write(source, "original\n")
+    if scenario == "existing-target":
+        write(target, "previous backup\n")
+
+    result = run(
+        f'Backup-File -Source "{source}" -Target "{target}"',
+        answer="n" if scenario == "declined" else "y",
+        check=False,
+    )
+
+    if scenario == "move":
+        assert result.returncode == 0, result
+        assert not source.exists()
+        assert target.read_text() == "original\n"
+    else:
+        assert result.returncode != 0, result
+        assert source.read_text() == "original\n"
+        if scenario == "existing-target":
+            assert "Backup target already exists." in result.stderr
+            assert target.read_text() == "previous backup\n"
+        else:
+            assert "Aborted by user." in result.stderr
+            assert not target.parent.exists()
+
+
 @pytest.fixture
 def home(tmp_path: Path) -> Path:
     path = tmp_path / "home"
@@ -61,6 +90,125 @@ def run(request: pytest.FixtureRequest, tmp_path: Path, home: Path):
         return process
 
     return run
+
+
+@pytest.mark.parametrize("direct", [False, True])
+@pytest.mark.parametrize("exit_code", [0, 7])
+def test_command_log_checks_native_exit_code(run, direct, exit_code):
+    result = run(
+        f"""
+        Write-CommandLog {{
+            & $env:ComSpec /d /c "echo native-output & exit {exit_code}" | ForEach-Object {{ $_ }}
+        }} -IsDirectOutput ${str(direct).lower()}
+        Write-Output "completed"
+        """,
+        check=False,
+    )
+
+    assert "native-output" in result.stdout
+    if exit_code:
+        assert result.returncode != 0
+        assert f"Command failed (exit code: {exit_code})" in result.stderr
+        assert "completed" not in result.stdout
+    else:
+        assert result.returncode == 0, result
+        assert "completed" in result.stdout
+
+
+@pytest.mark.parametrize("direct", [False, True])
+@pytest.mark.parametrize(
+    "exit_code, success_exit_codes, succeeds",
+    [(0, "0", True), (7, "0, 7", True), (7, "0", False)],
+)
+def test_command_log_accepts_only_configured_exit_codes(run, direct, exit_code, success_exit_codes, succeeds):
+    result = run(
+        f"""
+        Write-CommandLog {{
+            & $env:ComSpec /d /c "echo native-output & exit {exit_code}"
+        }} -IsDirectOutput ${str(direct).lower()} -SuccessExitCodes @({success_exit_codes})
+        Write-Output "exit-code=$global:LASTEXITCODE"
+        Write-Output "completed"
+        """,
+        check=False,
+    )
+
+    assert "native-output" in result.stdout
+    if succeeds:
+        assert result.returncode == 0, result
+        assert f"exit-code={exit_code}" in result.stdout
+        assert "completed" in result.stdout
+    else:
+        assert result.returncode != 0
+        assert "Command failed (exit code: 7)" in result.stderr
+        assert "completed" not in result.stdout
+
+
+@pytest.mark.parametrize("direct", [False, True])
+def test_installer_disables_native_error_preference(run, tmp_path, direct):
+    script = tmp_path / "command.ps1"
+    write(
+        script,
+        f"""
+        $PSNativeCommandUseErrorActionPreference = $true
+        . "{INIT_DIR / "windows.ps1"}"
+        Write-CommandLog {{
+            & $env:ComSpec /d /c "exit 7"
+        }} -IsDirectOutput ${str(direct).lower()} -SuccessExitCodes @(0, 7)
+        Write-Output "exit-code=$global:LASTEXITCODE"
+        """,
+    )
+
+    result = run(f'& "{script}"')
+
+    assert "exit-code=7" in result.stdout, result
+    assert "Hello, Windows!" not in result.stdout
+
+
+@pytest.mark.parametrize("direct", [False, True])
+def test_command_log_ignores_stale_exit_code_and_preserves_output(run, direct):
+    result = run(
+        f"""
+        & $env:ComSpec /d /c "exit 7"
+        $output = @(Write-CommandLog {{ 42 }} -IsDirectOutput ${str(direct).lower()})
+        if ($output.Count -ne {1 if direct else 0}) {{ throw "Unexpected output count" }}
+        {"if ($output[0] -ne 42) { throw 'Output changed' }" if direct else ""}
+        Write-CommandLog {{ Get-Item -LiteralPath $env:USERPROFILE }}
+        """
+    )
+
+    assert result.returncode == 0, result
+    assert "Command failed" not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("direct", [False, True])
+def test_command_log_preserves_powershell_errors(run, direct):
+    result = run(
+        f'Write-CommandLog {{ throw "original-error" }} -IsDirectOutput ${str(direct).lower()}',
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "original-error" in result.stderr
+
+
+@pytest.mark.parametrize("exit_code", [0, -1978335189, 7])
+def test_winget_install_accepts_only_success_and_no_update(run, exit_code):
+    result = run(
+        f"""
+        function global:winget {{ & $env:ComSpec /d /c "exit {exit_code}" }}
+        Update-WinGetPackage "Test.Package"
+        Write-Output "completed"
+        """,
+        check=False,
+    )
+
+    if exit_code in (0, -1978335189):
+        assert result.returncode == 0, result
+        assert "completed" in result.stdout
+    else:
+        assert result.returncode != 0
+        assert "Command failed (exit code: 7)" in result.stderr
+        assert "completed" not in result.stdout
 
 
 class Registry:

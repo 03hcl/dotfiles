@@ -62,6 +62,7 @@ if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSC
 """
 
 REMOTE_FILES = {
+    ".gitattributes": (INIT_DIR.parent / ".gitattributes").read_text(encoding="utf-8"),
     ".dotfiles-init/windows.ps1": (INIT_DIR / "windows.ps1").read_text(encoding="utf-8"),
     ".dotfiles-init/windows_utils.psm1": (INIT_DIR / "windows_utils.psm1").read_text(encoding="utf-8"),
     ".dotfiles-init/step998_test/linux.sh": "#!/usr/bin/env sh\n",
@@ -141,15 +142,17 @@ def assert_completed(result: Result, steps: int = 2) -> None:
     assert result.returncode == 0, result
     assert result.stdout.count("Hello, Windows!") == 1, result
     assert "Successfully completed!" in result.stdout, result
-    assert f"Found {steps} additional steps." in result.stdout, result
+    assert f"Found {steps} additional steps to run." in result.stdout, result
     assert result.stdout.count("Step 999: Test Step") == 1, result
     assert result.winget_calls == WINGET_CALLS
 
 
-def assert_cloned(repo: Path, remote: Remote) -> None:
-    assert read_tree(repo) == read_tree(remote.work)
+def assert_cloned(repo: Path, remote: Remote, skip: tuple[str, ...] = (".git", ".orig", "AppData")) -> None:
+    remote_files = read_tree(remote.work, skip=skip)
+    assert all("\r" not in content for content in remote_files.values())
+    assert read_tree(repo, skip=skip) == remote_files
     assert git("-C", str(repo), "config", "remote.origin.url", env=remote.env) == GITHUB_URL
-    assert git("-C", str(repo), "status", "--porcelain", env=remote.env) == ""
+    assert git("-C", str(repo), "status", "--porcelain", "--untracked-files=no", env=remote.env) == ""
     assert git("-C", str(repo), "rev-parse", "--abbrev-ref", "HEAD", "@{upstream}", env=remote.env) == "main\norigin/main"
 
 
@@ -170,19 +173,19 @@ def test_installs_repository(run, remote, home, command, execution_policy):
     result = run(command, execution_policy)
 
     assert_completed(result)
-    assert_cloned(home / ".dotfiles", remote)
+    assert_cloned(home, remote)
 
 
 def test_updates_repository(run, remote, home):
     remote.push(REMOTE_FILES)
-    git("clone", "--quiet", GITHUB_URL, str(home / ".dotfiles"), env=remote.env)
+    git("clone", "--quiet", GITHUB_URL, str(home), env=remote.env)
     remote.push({"README.md": "updated\n"})
 
     # README.md: Update
-    result = run(r'& "$HOME\.dotfiles\.dotfiles-init\windows.ps1"')
+    result = run(r'& "$HOME\.dotfiles-init\windows.ps1"')
 
     assert_completed(result)
-    assert_cloned(home / ".dotfiles", remote)
+    assert_cloned(home, remote)
 
 
 def test_runs_single_step(run, remote, home):
@@ -194,28 +197,43 @@ def test_runs_single_step(run, remote, home):
     assert_completed(result, steps=1)
 
 
-def test_backs_up_unexpected_directory(run, remote, home):
+def test_backs_up_conflicting_file_and_preserves_untracked_files(run, remote, home):
     remote.push(REMOTE_FILES)
-    write(home / ".dotfiles" / "old.txt", "old\n")
+    write(home / ".dotfiles-init" / "windows.ps1", "local changes\n")
+    write(home / "untracked.txt", "keep\n")
 
     result = run('& "$env:TEST_WINDOWS_PS1"', answer="y")
 
     assert_completed(result)
-    assert_cloned(home / ".dotfiles", remote)
+    assert_cloned(home, remote, skip=(".git", ".orig", "AppData", "untracked.txt"))
+    assert (home / "untracked.txt").read_text() == "keep\n"
     [backup] = (home / ".orig").iterdir()
     assert BACKUP_NAME.fullmatch(backup.name), backup
-    assert read_tree(backup) == {".dotfiles/old.txt": "old\n"}
+    assert read_tree(backup) == {".dotfiles-init/windows.ps1": "local changes\n"}
 
 
 def test_aborts_backup_when_declined(run, remote, home):
     remote.push(REMOTE_FILES)
-    write(home / ".dotfiles" / "old.txt", "old\n")
+    write(home / ".dotfiles-init" / "windows.ps1", "local changes\n")
 
     result = run('& "$env:TEST_WINDOWS_PS1"', answer="n")
 
     assert result.returncode != 0, result
     assert "Aborted by user." in result.stdout + result.stderr, result
-    assert read_tree(home / ".dotfiles", skip=()) == {"old.txt": "old\n"}
+    assert (home / ".dotfiles-init" / "windows.ps1").read_text() == "local changes\n"
+    assert not (home / ".orig").exists()
+
+
+def test_rejects_unexpected_remote_without_backing_up_home(run, remote, home):
+    git("init", "--quiet", str(home), env=remote.env)
+    git("-C", str(home), "remote", "add", "origin", "https://example.invalid/other.git", env=remote.env)
+    write(home / "important.txt", "keep\n")
+
+    result = run('& "$env:TEST_WINDOWS_PS1"', answer="y")
+
+    assert result.returncode != 0, result
+    assert "Unexpected remote URL." in result.stdout + result.stderr, result
+    assert (home / "important.txt").read_text() == "keep\n"
     assert not (home / ".orig").exists()
 
 

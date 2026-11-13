@@ -5,6 +5,7 @@ param([int]$MaxStep)
 
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $false
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 function Confirm-Action ([string]$Message) { return (Read-Host "${Message} [y/N]") -ieq "y" }
@@ -64,13 +65,27 @@ function Write-Step ([int]$Step, [string]$Name) {
     Write-Log
 }
 
-function Write-CommandLog ([ScriptBlock]$Script, [bool]$IsDirectOutput = $false, [string]$Level = "INFO") {
+function Write-CommandLog {
+    param(
+        [ScriptBlock]$Script,
+        [bool]$IsDirectOutput = $false,
+        [string]$Level = "INFO",
+        [int[]]$SuccessExitCodes = @(0)
+    )
+
     Write-Log ("-" * 72) "${Level}"
     Write-Log (" -> Command: ``$($Script.ToString().Trim())``") "${Level}"
     Write-Log ("-" * 72) "${Level}"
 
+    # NOTE: Native commands set the global exit code; a local variable would hide it.
+    $global:LASTEXITCODE = 0
+
     if (${IsDirectOutput}) { & ${Script} }
     else { Write-Log (& ${Script} | Out-String) "${Level}" }
+
+    if ($SuccessExitCodes -notcontains ${global:LASTEXITCODE}) {
+        throw "Command failed (exit code: ${global:LASTEXITCODE}): $($Script.ToString().Trim())"
+    }
 }
 
 function Step1 {
@@ -104,7 +119,7 @@ function Update-WinGetPackage {
     if (${Scope}) { $command += " --scope ${Scope}" }
 
     if (${PSCmdlet}.ShouldProcess("${Id}", "${command}")) {
-        Write-CommandLog ([ScriptBlock]::Create(${command})) -IsDirectOutput $true
+        Write-CommandLog ([ScriptBlock]::Create(${command})) -IsDirectOutput $true -SuccessExitCodes @(0, -1978335189)
     }
 }
 
@@ -117,65 +132,122 @@ function Step2 {
     Write-CommandLog { git --version }
 }
 
-function Update-LocalRepo ([string]$Remote, [string]$Local, [string]$Origin, [string]$Branch) {
-    if (-not (Test-Path -LiteralPath "$(Join-Path "${Local}" ".git")")) { return $false }
-    if ((git -C "${Local}" remote get-url "${Origin}") -ne "${Remote}") { return $false }
-
-    $actualBranch = git -C "${Local}" branch -vv | Where-Object { $_.Contains("[${Origin}/${Branch}]") }
-    if (${actualBranch}) {
-        if (${actualBranch} -isnot [string]) { return $false }
-        if ((${actualBranch} -split "[\s\*]+")[1] -ne "${Branch}") { return $false }
-    }
-
-    Write-Log " -> Update repository."
-
-    git -C "${Local}" fetch "${Origin}" "${Branch}"
-    git -C "${Local}" checkout --detach
-    git -C "${Local}" branch --force "${Branch}" "${Origin}/${Branch}"
-    git -C "${Local}" switch "${Branch}"
-
-    return $true
-}
-
-function Backup-Directory ([string]$Source) {
-    $target = Get-BackupPath "${Source}"
-
-    Write-Log " -> Failed to update source directory. Backing up to target directory."
+function Backup-File ([string]$Source, [string]$Target) {
+    Write-Log " -> Back up existing file."
     Write-Log "        Source: '${Source}'"
-    Write-Log "        Target: '${target}'"
+    Write-Log "        Target: '${Target}'"
 
     if (-not (Confirm-Action "Confirm backup?")) {
         Write-Log " -> Aborted." "ERROR"
         throw "Aborted by user."
     }
 
-    if (Test-Path -LiteralPath "${target}") { throw "Backup target already exists." }
+    if (Test-Path -LiteralPath "${Target}") { throw "Backup target already exists." }
 
-    Write-Log " -> Backup started."
-
-    New-Item -Path "$(Split-Path "${target}")" -ItemType "Directory" -Force > $null
-    Move-Item -LiteralPath "${Source}" -Destination "${target}"
-
-    Write-Log " -> Backup completed."
+    New-Item -Path "$(Split-Path "${Target}")" -ItemType "Directory" -Force > $null
+    Move-Item -LiteralPath "${Source}" -Destination "${Target}"
 }
 
-function Backup-LocalRepo ([string]$Local) { Backup-Directory "${Local}" }
+function Initialize-LocalRepo {
+    param(
+        [string]$LocalRepo = "${env:USERPROFILE}",
+        [string]$RemoteRepo,
+        [string]$Origin,
+        [string]$Branch
+    )
+    $gitArgs = @("-C", "${LocalRepo}")
+    $gitDir = Join-Path "${LocalRepo}" ".git"
 
-function Get-RemoteRepo ([string]$Remote, [string]$Local, [string]$Origin, [string]$Branch) {
-    if (Test-Path -LiteralPath "${Local}") { return }
-    Write-Log " -> Clone repository."
-    git clone "${Remote}" "${Local}" --origin "${Origin}" --branch "${Branch}"
-}
-
-function Step3 ([string]$Remote, [string]$Local, [string]$Origin = "origin", [string]$Branch = "main") {
-    Write-Step 3 "Clone 03hcl/dotfiles Repository"
-
-    if (Test-Path -LiteralPath "${Local}") {
-        $isUpdated = Update-LocalRepo "${Remote}" "${Local}" "${Origin}" "${Branch}"
-        if (-not ${isUpdated}) { Backup-LocalRepo "${Local}" }
+    if (-not (Test-Path -LiteralPath "${gitDir}")) {
+        Write-Log " -> Initialize repository."
+        Write-CommandLog { git @gitArgs init "--initial-branch=${Branch}" }
+        Write-CommandLog { git @gitArgs remote add "${Origin}" "${RemoteRepo}" }
     }
 
-    Get-RemoteRepo "${Remote}" "${Local}" "${Origin}" "${Branch}"
+    $gitItem = Get-Item -LiteralPath "${gitDir}" -Force -ErrorAction "SilentlyContinue"
+    if (
+        (-not ${gitItem}) `
+        -or (-not ${gitItem}.PSIsContainer) `
+        -or (${gitItem}.Attributes -band [System.IO.FileAttributes]::ReparsePoint)
+    ) {
+        Write-Log " -> Unexpected '.git'. Expected a directory, not a symbolic link." "ERROR"
+        Write-Log "        Path:     ${gitDir}" "ERROR"
+        throw "Unexpected .git directory."
+    }
+
+    $actualRemoteRepo = Write-CommandLog { git @gitArgs remote get-url "${Origin}" } -IsDirectOutput $true
+    if ("${actualRemoteRepo}" -ne "${RemoteRepo}") {
+        Write-Log " -> Unexpected remote URL." "ERROR"
+        Write-Log "        Actual:   ${actualRemoteRepo}" "ERROR"
+        Write-Log "        Expected: ${RemoteRepo}" "ERROR"
+        throw "Unexpected remote URL."
+    }
+
+    Write-Log " -> Fetch repository."
+    Write-CommandLog { git @gitArgs fetch "${Origin}" "${Branch}" }
+
+    Write-CommandLog { git @gitArgs rev-parse --verify HEAD } -SuccessExitCodes @(0, 128)
+
+    if ($global:LASTEXITCODE -eq 128) {
+        Write-Log " -> Checkout repository."
+        Write-CommandLog { git @gitArgs read-tree FETCH_HEAD }
+        Write-CommandLog { git @gitArgs update-index -q --refresh }
+
+        $files = Write-CommandLog { git @gitArgs -c core.quotePath=false ls-files --modified } -IsDirectOutput $true
+        $localRoot = [System.IO.Path]::GetFullPath("${LocalRepo}").TrimEnd("\")
+        foreach ($file in ${files}) {
+            if (-not "${file}") { continue }
+
+            $source = Join-Path "${LocalRepo}" "${file}"
+            if (-not (Test-Path -LiteralPath "${source}")) { continue }
+
+            $parent = Split-Path "${source}" -Parent
+            while (${parent} -and (-not ${parent}.Equals("${localRoot}", [System.StringComparison]::OrdinalIgnoreCase))) {
+                $parentItem = Get-Item -LiteralPath "${parent}" -Force
+                if ($parentItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                    Write-Log " -> Unexpected symbolic link in the parent directories." "ERROR"
+                    Write-Log "        Path:     ${parent}" "ERROR"
+                    throw "Unexpected symbolic link in a parent directory."
+                }
+                $parent = Split-Path "${parent}" -Parent
+            }
+
+            Backup-File "${source}" (Get-BackupPath "${source}")
+        }
+
+        Write-CommandLog { git @gitArgs checkout-index -a }
+        Write-CommandLog { git @gitArgs symbolic-ref HEAD "refs/heads/${Branch}" }
+        Write-CommandLog { git @gitArgs update-ref "refs/heads/${Branch}" FETCH_HEAD }
+        Write-CommandLog { git @gitArgs branch "--set-upstream-to=${Origin}/${Branch}" "${Branch}" }
+        Write-CommandLog { git @gitArgs remote set-head "${Origin}" "${Branch}" }
+    }
+    else {
+        Write-Log " -> Update repository."
+        $remoteHead = Write-CommandLog { git @gitArgs rev-parse --verify "FETCH_HEAD^{commit}" } -IsDirectOutput $true
+
+        Write-CommandLog { git @gitArgs merge-base --is-ancestor "${remoteHead}" HEAD } -SuccessExitCodes @(0, 1)
+        if ($global:LASTEXITCODE -eq 0) { return }
+
+        $actualBranch = Write-CommandLog { git @gitArgs branch --show-current } -IsDirectOutput $true
+        if ("${actualBranch}" -ne "${Branch}") {
+            Write-Log " -> Unexpected current branch." "ERROR"
+            Write-Log "        Actual:   ${actualBranch}" "ERROR"
+            Write-Log "        Expected: ${Branch}" "ERROR"
+            throw "Unexpected current branch."
+        }
+
+        if (Write-CommandLog { git @gitArgs status --porcelain --untracked-files=no } -IsDirectOutput $true) {
+            Write-Log " -> Uncommitted changes exist. Commit or stash them first." "ERROR"
+            throw "Uncommitted changes exist."
+        }
+
+        Write-CommandLog { git @gitArgs merge --ff-only --no-overwrite-ignore "${remoteHead}" }
+    }
+}
+
+function Step3 ([string]$RemoteRepo, [string]$Origin = "origin", [string]$Branch = "main") {
+    Write-Step 3 "Initialize or Update 03hcl/dotfiles Repository"
+    Initialize-LocalRepo -RemoteRepo "${RemoteRepo}" -Origin "${Origin}" -Branch "${Branch}"
 }
 
 function Step4 ([string]$Local, [int]$MaxStep) {
@@ -215,12 +287,11 @@ function Initialize-Dotfiles {
     Remove-Variable -Name "DotfilesInitBackupDir" -Scope "Global" -ErrorAction "SilentlyContinue"
 
     $remoteRepoPath = "https://github.com/03hcl/dotfiles.git"
-    $localRepoPath = Join-Path "${env:USERPROFILE}" ".dotfiles"
 
     if (${MaxStep} -ge 1) { Step1 }
     if (${MaxStep} -ge 2) { Step2 }
-    if (${MaxStep} -ge 3) { Step3 "${remoteRepoPath}" "${localRepoPath}" }
-    if (${MaxStep} -ge 4) { Step4 "${localRepoPath}" ${MaxStep} }
+    if (${MaxStep} -ge 3) { Step3 "${remoteRepoPath}" }
+    if (${MaxStep} -ge 4) { Step4 "${env:USERPROFILE}" ${MaxStep} }
 
     Write-Log
     Write-Log ("=" * 72)
