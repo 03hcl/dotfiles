@@ -63,7 +63,7 @@ function Install-VSCodeExtensions {
     try {
         # NOTE: Suppress only the VS Code CLI's legacy URL warning.
         $env:NODE_OPTIONS = "${optBackUp} --disable-warning=DEP0169".Trim()
-        code @installArgs --force
+        Write-CommandLog { code @installArgs --force } -IsDirectOutput $true
     }
     finally { $env:NODE_OPTIONS = $optBackUp }
 }
