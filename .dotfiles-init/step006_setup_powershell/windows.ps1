@@ -8,17 +8,28 @@ $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 function Update-PowerShell {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSShouldProcess", "")]
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
+
     Update-WinGetPackage "Microsoft.PowerShell"
 
     # Reference:
     #   https://learn.microsoft.com/ja-jp/powershell/scripting/install/installing-powershell-on-windows
     Update-Path "${env:ProgramFiles}\PowerShell\7\"
 
-    Write-CommandLog { pwsh --version }
-    Write-CommandLog { ${Host} }
+    if (-not ${WhatIfPreference}) {
+        Write-CommandLog { pwsh --version }
+        Write-CommandLog { ${Host} }
+    }
 }
 
 function Update-PowerShellProfile {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
+
+    if (-not ${PSCmdlet}.ShouldProcess("${env:USERPROFILE}", "Update Windows PowerShell and PowerShell profiles")) { return }
+
     Write-CommandLog { ${PROFILE} | Format-List -Force }
 
     $target = (powershell -NoProfile -Command "`${PROFILE}.CurrentUserAllHosts")
@@ -28,12 +39,19 @@ function Update-PowerShellProfile {
 }
 
 function Update-ExecutionPolicy {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSShouldProcess", "")]
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
+
     Set-ExecutionPolicy -ExecutionPolicy "RemoteSigned" -Scope "CurrentUser"
     Write-Log
-    Write-CommandLog { Get-ExecutionPolicy -List }
+    if (-not ${WhatIfPreference}) { Write-CommandLog { Get-ExecutionPolicy -List } }
 }
 
 function Enable-DeveloperMode {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
+
     $key = "SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
     $value = "AllowDevelopmentWithoutDevLicense"
     $type = "DWord"
@@ -46,6 +64,8 @@ function Enable-DeveloperMode {
         if (${prop} -and ${prop}."${value}" -eq "${data}") { return }
     }
 
+    if (-not ${PSCmdlet}.ShouldProcess("${path}", "Enable Developer Mode")) { return }
+
     Start-Process pwsh -Verb "RunAs" -Wait -ArgumentList @(
         "-NoProfile",
         "-Command",
@@ -54,14 +74,23 @@ function Enable-DeveloperMode {
 }
 
 function Install-BusyBox {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
+
     Update-WinGetPackage "frippery.busybox-w32"
-    New-WinGetPackageLink -Id "frippery.busybox-w32" -Command "busybox"
-    Import-Path
+    if (${PSCmdlet}.ShouldProcess("busybox", "Create WinGet package command link")) {
+        New-WinGetPackageLink -Id "frippery.busybox-w32" -Command "busybox"
+    }
+    if (-not ${WhatIfPreference}) { Import-Path }
 
     if (-not ${WhatIfPreference}) { Write-CommandLog { busybox | busybox head -n 2 } }
 }
 
 function Install-Cygwin {
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSShouldProcess", "")]
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
+
     Update-WinGetPackage "Cygwin.Cygwin"
 
     $root = "C:\cygwin64"
@@ -81,10 +110,15 @@ function Install-Cygwin {
     )
     Update-Path -ForceFirst -Key "LD_LIBRARY_PATH" @(${libs})
 
-    Write-CommandLog { cygcheck -c cygwin }
+    if (-not ${WhatIfPreference}) { Write-CommandLog { cygcheck -c cygwin } }
 }
 
 function Install-CygwinPackages {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
+
+    if (-not ${PSCmdlet}.ShouldProcess("Cygwin", "Download setup and install packages")) { return }
+
     $packages = @(
         # "automake",
         "bash-completion",
@@ -130,12 +164,31 @@ function Install-CygwinPackages {
 }
 
 function Install-Jq {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
+
     Update-WinGetPackage "jqlang.jq"
     # New-SymLink -Source "${env:LOCALAPPDATA}\Microsoft\WinGet\Links\jq.exe"
-    New-WinGetPackageLink -Id "jqlang.jq" -Command "jq"
-    Import-Path
+    if (${PSCmdlet}.ShouldProcess("jq", "Create WinGet package command link")) {
+        New-WinGetPackageLink -Id "jqlang.jq" -Command "jq"
+    }
+    if (-not ${WhatIfPreference}) { Import-Path }
 
     if (-not ${WhatIfPreference}) { Write-CommandLog { jq --version } }
+}
+
+function Install-Pester {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param()
+
+    $command = '$ErrorActionPreference = "Stop"; Install-Module -Name Pester -MinimumVersion 5.0 -Scope CurrentUser -Force -SkipPublisherCheck'
+
+    if (${PSCmdlet}.ShouldProcess("powershell", "Install Pester 5 or later for the current user")) {
+        Write-CommandLog { & powershell -NoProfile -Command $command } -IsDirectOutput $true
+    }
+    if (${PSCmdlet}.ShouldProcess("pwsh", "Install Pester 5 or later for the current user")) {
+        Write-CommandLog { & pwsh -NoProfile -Command $command } -IsDirectOutput $true
+    }
 }
 
 function Step6 {
@@ -148,23 +201,27 @@ function Step6 {
     Update-PowerShellProfile
     Update-ExecutionPolicy
 
-    if (-not ${WhatIfPreference}) { . ${PROFILE}.CurrentUserAllHosts }
+    if (${PSCmdlet}.ShouldProcess("${PROFILE}.CurrentUserAllHosts", "Load PowerShell profile")) {
+        . ${PROFILE}.CurrentUserAllHosts
+    }
 
     # Enable-DeveloperMode
 
-    $commonParams = Get-CommonParameters $PSBoundParameters
-    Update-Path @commonParams -ForceFirst `
+    Update-Path -ForceFirst `
         "%USERPROFILE%\.local\bin" `
         "%LOCALAPPDATA%\Microsoft\WinGet\Links"
 
-    Write-CommandLog { Get-ChildItem "${env:APPDATA}\Microsoft\Windows\PowerShell\PSReadLine" }
-    Write-CommandLog { Get-PSReadLineOption }
-    Write-CommandLog { Get-PSReadLineKeyHandler }
+    if (-not ${WhatIfPreference}) {
+        Write-CommandLog { Get-ChildItem "${env:APPDATA}\Microsoft\Windows\PowerShell\PSReadLine" }
+        Write-CommandLog { Get-PSReadLineOption }
+        Write-CommandLog { Get-PSReadLineKeyHandler }
+    }
 
     Install-BusyBox
     # Install-Cygwin
     # Install-CygwinPackages
     Install-Jq
+    Install-Pester
 }
 
 if ((-not ${MyInvocation}.ScriptName) -or (${MyInvocation}.ScriptName -ne "${PSCommandPath}")) {

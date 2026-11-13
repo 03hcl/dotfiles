@@ -4,6 +4,7 @@
 
 Tests are written in Python with [pytest](https://docs.pytest.org/).
 Tests of PowerShell scripts run on every PowerShell found (`pwsh` and Windows PowerShell 5.1 `powershell`).
+`step006_setup_powershell` also installs Pester 5 or later for both shells for future PowerShell-native tests; the current tests still use pytest.
 
 Requirements:
 

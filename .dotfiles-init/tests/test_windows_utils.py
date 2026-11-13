@@ -211,6 +211,43 @@ def test_winget_install_accepts_only_success_and_no_update(run, exit_code):
         assert "completed" not in result.stdout
 
 
+@pytest.mark.parametrize("command", ["path", "winget"])
+@pytest.mark.parametrize(
+    "outer_args, inner_args, executed, succeeds",
+    [
+        ("-WhatIf", "", False, True),
+        ("-WhatIf", "-WhatIf:$false", True, True),
+        ("-Confirm", "", False, False),
+        ("-Confirm", "-Confirm:$false", True, True),
+        ("-Confirm:$false", "", True, True),
+    ],
+)
+def test_module_commands_inherit_caller_preferences(run, registry, command, outer_args, inner_args, executed, succeeds):
+    registry.set(r"C:\original")
+    result = run(
+        f"""
+        function global:winget {{ Write-Output "winget-executed" }}
+        $ConfirmPreference = "{'Low' if outer_args == '-Confirm:$false' else 'High'}"
+        function Invoke-Setup {{
+            [CmdletBinding(SupportsShouldProcess = $true)]
+            param()
+            {
+                f'Update-Path -Path "{registry.ps_path}" -Key "{KEY}" "C:\\new" {inner_args}'
+                if command == "path"
+                else f'Update-WinGetPackage "Test.Package" {inner_args}'
+            }
+        }}
+        Invoke-Setup {outer_args}
+        """,
+        check=False,
+    )
+
+    assert (result.returncode == 0) == succeeds, result
+    assert ("winget-executed" in result.stdout) == (executed and command == "winget"), result
+    expected = r"C:\new;C:\original" if executed and command == "path" else r"C:\original"
+    assert registry.get() == (expected, winreg.REG_EXPAND_SZ)
+
+
 class Registry:
     """Temporary registry key under HKCU that stands in for HKCU\\Environment."""
 

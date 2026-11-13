@@ -108,6 +108,14 @@ function Update-WinGetPackage {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param([string]$Id, [string]$Source = "winget", [string]$Scope = "")
 
+    # NOTE: Module functions need the caller's session state to inherit preference variables.
+    if (-not $PSBoundParameters.ContainsKey("WhatIf")) {
+        $WhatIfPreference = $PSCmdlet.SessionState.PSVariable.GetValue("WhatIfPreference", $false)
+    }
+    if (-not $PSBoundParameters.ContainsKey("Confirm")) {
+        $ConfirmPreference = $PSCmdlet.SessionState.PSVariable.GetValue("ConfirmPreference", [System.Management.Automation.ConfirmImpact]::High)
+    }
+
     # $command = "winget list --source '${Source}' --id '${Id}'"
     # $installed = Write-CommandLog ([ScriptBlock]::Create($command)) -IsDirectOutput $true | Select-String '^[-]+$'
 

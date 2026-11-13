@@ -287,6 +287,14 @@ function Update-Path {
         [string[]]$Values
     )
 
+    # NOTE: Preserve explicit arguments; otherwise inherit preferences across the module boundary.
+    if (-not $PSBoundParameters.ContainsKey("WhatIf")) {
+        $WhatIfPreference = $PSCmdlet.SessionState.PSVariable.GetValue("WhatIfPreference", $false)
+    }
+    if (-not $PSBoundParameters.ContainsKey("Confirm")) {
+        $ConfirmPreference = $PSCmdlet.SessionState.PSVariable.GetValue("ConfirmPreference", [System.Management.Automation.ConfirmImpact]::High)
+    }
+
     $valid = ${Values} | ForEach-Object { $_.Trim() } | Where-Object { $_ }
     if (${valid}) { [array]::Reverse(${valid}) }
 
