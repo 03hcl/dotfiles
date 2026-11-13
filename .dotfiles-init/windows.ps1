@@ -30,6 +30,34 @@ function Get-BackupPath ([string]$Source) {
     return Join-Path "${global:DotfilesInitBackupDir}" "${rel}"
 }
 
+function Import-CallerPreference {
+    param([System.Management.Automation.PSCmdlet]$Cmdlet, [System.Management.Automation.SessionState]$SessionState)
+
+    $preferences = @(
+        [pscustomobject]@{ Parameter = "Confirm";           Variable = "ConfirmPreference" }
+        [pscustomobject]@{ Parameter = "Debug";             Variable = "DebugPreference" }
+        [pscustomobject]@{ Parameter = "ErrorAction";       Variable = "ErrorActionPreference" }
+        [pscustomobject]@{ Parameter = "InformationAction"; Variable = "InformationPreference" }
+        [pscustomobject]@{ Parameter = "ProgressAction";    Variable = "ProgressPreference" }
+        [pscustomobject]@{ Parameter = "Verbose";           Variable = "VerbosePreference" }
+        [pscustomobject]@{ Parameter = "WarningAction";     Variable = "WarningPreference" }
+        [pscustomobject]@{ Parameter = "WhatIf";            Variable = "WhatIfPreference" }
+    )
+
+    foreach ($pref in $preferences) {
+        if (${Cmdlet}.MyInvocation.BoundParameters.ContainsKey(${pref}.Parameter)) { continue }
+        $varName = ${pref}.Variable
+        $var = ${Cmdlet}.SessionState.PSVariable.Get(${varName})
+        if ($null -eq ${var}) { continue }
+
+        # NOTE: Write into the calling function's scope, not this helper's module scope.
+        if (${SessionState} -eq ${ExecutionContext}.SessionState) {
+            Set-Variable -Name ${varName} -Value ${var}.Value -Scope 1 -WhatIf:$false -Confirm:$false
+        }
+        else { ${SessionState}.PSVariable.Set(${varName}, ${var}.Value) }
+    }
+}
+
 function Import-Path {
     $env:Path = [System.Environment]::ExpandEnvironmentVariables(
         [System.Environment]::GetEnvironmentVariable("Path", "Machine") +
@@ -108,13 +136,7 @@ function Update-WinGetPackage {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param([string]$Id, [string]$Source = "winget", [string]$Scope = "")
 
-    # NOTE: Module functions need the caller's session state to inherit preference variables.
-    if (-not $PSBoundParameters.ContainsKey("WhatIf")) {
-        $WhatIfPreference = $PSCmdlet.SessionState.PSVariable.GetValue("WhatIfPreference", $false)
-    }
-    if (-not $PSBoundParameters.ContainsKey("Confirm")) {
-        $ConfirmPreference = $PSCmdlet.SessionState.PSVariable.GetValue("ConfirmPreference", [System.Management.Automation.ConfirmImpact]::High)
-    }
+    Import-CallerPreference -Cmdlet ${PSCmdlet} -SessionState ${ExecutionContext}.SessionState
 
     # $command = "winget list --source '${Source}' --id '${Id}'"
     # $installed = Write-CommandLog ([ScriptBlock]::Create($command)) -IsDirectOutput $true | Select-String '^[-]+$'

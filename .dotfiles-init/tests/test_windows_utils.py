@@ -211,6 +211,84 @@ def test_winget_install_accepts_only_success_and_no_update(run, exit_code):
         assert "completed" not in result.stdout
 
 
+def test_import_caller_preference_only_changes_calling_function_scope(run):
+    result = run(
+        """
+        $WhatIfPreference = $false
+        $ConfirmPreference = "High"
+        $module = New-Module {
+            $WhatIfPreference = $false
+            $ConfirmPreference = "High"
+            function Invoke-Inner {
+                [CmdletBinding(SupportsShouldProcess = $true)]
+                param()
+                Import-CallerPreference -Cmdlet $PSCmdlet -SessionState $ExecutionContext.SessionState
+                Write-Output "inner=$WhatIfPreference,$ConfirmPreference"
+            }
+            function Get-ModulePreference {
+                Write-Output "module=$WhatIfPreference,$ConfirmPreference"
+            }
+        }
+        Import-Module $module
+        function Invoke-Outer {
+            [CmdletBinding(SupportsShouldProcess = $true)]
+            param()
+            Invoke-Inner
+        }
+        Invoke-Outer -WhatIf -Confirm:$false
+        Get-ModulePreference
+        Write-Output "outer=$WhatIfPreference,$ConfirmPreference"
+        """
+    )
+    assert "inner=True,None" in result.stdout
+    assert "module=False,High" in result.stdout
+    assert "outer=False,High" in result.stdout
+
+
+def test_import_caller_preference_inherits_all_common_preference_variables(run):
+    result = run(
+        """
+        $module = New-Module {
+            $WhatIfPreference = $false
+            $ConfirmPreference = "High"
+            $DebugPreference = "SilentlyContinue"
+            $ErrorActionPreference = "Continue"
+            $InformationPreference = "SilentlyContinue"
+            $ProgressPreference = "Continue"
+            $VerbosePreference = "SilentlyContinue"
+            $WarningPreference = "Continue"
+            function Invoke-Inner {
+                [CmdletBinding()]
+                param()
+                Import-CallerPreference -Cmdlet $PSCmdlet -SessionState $ExecutionContext.SessionState
+                Write-Output "inner=$WhatIfPreference,$ConfirmPreference,$DebugPreference,$ErrorActionPreference,$InformationPreference,$ProgressPreference,$VerbosePreference,$WarningPreference"
+            }
+            function Get-ModulePreference {
+                Write-Output "module=$WhatIfPreference,$ConfirmPreference,$DebugPreference,$ErrorActionPreference,$InformationPreference,$ProgressPreference,$VerbosePreference,$WarningPreference"
+            }
+        }
+        Import-Module $module
+        function Invoke-Outer {
+            [CmdletBinding()]
+            param()
+            $WhatIfPreference = $true
+            $ConfirmPreference = "None"
+            $DebugPreference = "Continue"
+            $ErrorActionPreference = "Stop"
+            $InformationPreference = "Continue"
+            $ProgressPreference = "SilentlyContinue"
+            $VerbosePreference = "Continue"
+            $WarningPreference = "SilentlyContinue"
+            Invoke-Inner
+        }
+        Invoke-Outer
+        Get-ModulePreference
+        """
+    )
+    assert "inner=True,None,Continue,Stop,Continue,SilentlyContinue,Continue,SilentlyContinue" in result.stdout
+    assert "module=False,High,SilentlyContinue,Continue,SilentlyContinue,Continue,SilentlyContinue,Continue" in result.stdout
+
+
 @pytest.mark.parametrize("command", ["path", "winget"])
 @pytest.mark.parametrize(
     "outer_args, inner_args, executed, succeeds",

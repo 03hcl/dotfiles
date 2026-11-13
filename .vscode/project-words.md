@@ -23,6 +23,7 @@ stackdump
 
 ```plaintext
 LASTEXITCODE
+pscustomobject
 PSHOME
 useb
 ```
